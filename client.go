@@ -141,7 +141,7 @@ func saveMessage(s string) {
 	if len(messageSlice) > 0 {
 		fmt.Println("Found messages in the chatroom")
 		if err != nil {
-			log.Println(err) // not found ?
+			log.Println(err)
 		}
 		// if there is no messages it won't enter the loop
 		for i := 0; i < len(messageSlice); i++ {
