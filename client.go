@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/gorilla/websocket"
 	"gopkg.in/mgo.v2"
@@ -71,18 +72,24 @@ func (c *Client) readPump() {
 			break
 		}
 		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
-		saveMessage(string(message[:]))
+		msg := Message{}
+		err = json.Unmarshal(message, &msg)
+		// log.Printf("%+v\n", msg)
+		// log.Println(msg.UserName)
+		// log.Println(msg.Text)
+		if err != nil {
+			panic(err)
+		}
+		// log.Println(string(message[:]))
+		saveMessage(&msg)
 		// make hub broadcast the message
-		c.hub.broadcast <- message
+		// c.hub.broadcast <- message
+		c.hub.broadcast <- []byte(msg.UserName + ": " + msg.Text)
 	}
 }
 
-func saveMessage(s string) {
-	var message Message
+func saveMessage(message *Message) {
 	message.MessageId = bson.NewObjectId()
-	// Feature missing, get the user from somewhere
-	message.UserName = "Roberto"
-	message.Text = s
 	// save message
 	// connect to the database
 	session, err := mgo.Dial("127.0.0.1")
@@ -99,11 +106,11 @@ func saveMessage(s string) {
 	// find the chatroom at this request
 	// feature missing, get the chatroom name or id, hardcoding "devs"
 	// channel for now
-	err = c.Find(bson.M{"name": "devs"}).One(&room)
+	err = c.Find(bson.M{"name": message.ChatRoomName}).One(&room)
 	if err != nil { // channel not found
 		fmt.Println("Channel not found, creating new channel...")
 		// create new channel
-		room.Name = "devs"
+		room.Name = message.ChatRoomName
 		room.Level = "0"
 		room.Active = "true"
 		room.Id = bson.NewObjectId()
@@ -119,17 +126,12 @@ func saveMessage(s string) {
 		fmt.Println("Channel found!")
 	}
 	// construct the new message
-	var newMessage = Message{
-		MessageId:  message.MessageId,
-		Text:       message.Text,
-		UserName:   message.UserName,
-		ChatRoomId: room.Id,
-	}
+	message.ChatRoomId = room.Id
 	// insert the message into the messages collection, with this chatroom
 	// and the user id
-	err = m.Insert(newMessage) // works
+	err = m.Insert(message)
 	if err != nil {
-		panic(err)
+		panic(err) // error inserting
 	}
 	var messageSlice []Message
 	var bsonMessageSlice []bson.ObjectId
@@ -151,7 +153,7 @@ func saveMessage(s string) {
 		fmt.Println("Something wrong, couldn't find messages in the chatroom")
 	}
 	// append the new message
-	bsonMessageSlice = append(bsonMessageSlice, newMessage.MessageId)
+	bsonMessageSlice = append(bsonMessageSlice, message.MessageId)
 	// update the room with the new messsage
 	// Update the chatroom with this room's id, adding the last message
 	err = c.Update(bson.M{"_id": room.Id},

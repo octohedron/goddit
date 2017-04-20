@@ -7,15 +7,17 @@ window.onload = function () {
     // 
     // load the previous messages in the view from /history...
     // 
-    // Loads the chat history
-    fetch('http://192.168.1.43:9000/history/devs', {
+    var roomName = 'devs2';
+    fetch('http://192.168.1.43:9000/history/' + roomName, {
         method: 'get'
     }).then(function(response) {
-        console.log('loaded the json!')
+        console.log('loaded the history/'+ roomName + ' channel history');
         response.json().then(function(json) {
             for (var i = 0; i < json.length; i++) {
                 var item = document.createElement("div");
-                var message = json[i].name + ': ' + json[i].text;
+                var message = json[i].name 
+                    ? json[i].name + ': ' + json[i].text
+                    : json[i].text;
                 item.innerText = message;
                 appendLog(item);
             }
@@ -25,6 +27,7 @@ window.onload = function () {
     });
     var conn;
     var msg = document.getElementById("msg");
+    var nick = document.getElementById("nick");
     var log = document.getElementById("log");
 
     function appendLog(item) {
@@ -36,13 +39,26 @@ window.onload = function () {
     }
 
     document.getElementById("form").onsubmit = function () {
+        console.log('submit pressed!');
         if (!conn) {
+            console.log('no Connection');
             return false;
         }
         if (!msg.value) {
+            console.log('no Value');
             return false;
         }
-        conn.send(msg.value);
+        // MessageId:ObjectIdHex("") Text:hi UserName: ChatRoomName: ChatRoomId:ObjectIdHex("")
+        var json = {
+            _id: '',
+            text: msg.value, 
+            name: nick.value || 'Anonymous',
+            room_name: roomName,
+            chatRoomId: '',
+        };
+        // console.log(json);
+        console.log(JSON.stringify(json));
+        conn.send(JSON.stringify(json));
         msg.value = "";
         return false;
     };
@@ -112,6 +128,7 @@ body {
 <form id="form">
     <input type="submit" value="Send" />
     <input type="text" id="msg" size="64"/>
+    Nick: <input type="text" id="nick" size="30"/>
 </form>
 </body>
 </html>

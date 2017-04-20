@@ -30,10 +30,11 @@ type Chatroom struct {
 }
 
 type Message struct {
-	MessageId  bson.ObjectId `bson:"_id,omitempty" json:"_id,omitempty" inline`
-	Text       string        `bson:"text" json:"text"`
-	UserName   string        `bson:"name" json:"name"`
-	ChatRoomId bson.ObjectId `bson:"chatRoomId,omitempty" json:"chatRoomId,omitempty"`
+	MessageId    bson.ObjectId `bson:"_id,omitempty" json:"_id,omitempty" inline`
+	Text         string        `bson:"text" json:"text"`
+	UserName     string        `bson:"name" json:"name"`
+	ChatRoomName string        `bson:"room_name" json:"room_name"`
+	ChatRoomId   bson.ObjectId `bson:"chatRoomId,omitempty" json:"chatRoomId,omitempty"`
 }
 
 var addr = flag.String("addr", ":9000", "http service address")
@@ -60,7 +61,6 @@ func serveIndex(w http.ResponseWriter, r *http.Request) {
 func serveChannelHistory(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.URL)
 	vars := mux.Vars(r)
-	log.Println(vars["channel"])
 	// connect to the database
 	session, err := mgo.Dial("127.0.0.1")
 	if err != nil {
@@ -69,20 +69,45 @@ func serveChannelHistory(w http.ResponseWriter, r *http.Request) {
 	// close the session when done
 	defer session.Close()
 	session.SetMode(mgo.Monotonic, true)
-	// select the chatrooms collection
 	c := session.DB("views").C("chatrooms")
+	m := session.DB("views").C("messages")
 	var room Chatroom
 	// find the chatroom at this request
 	err = c.Find(bson.M{"name": vars["channel"]}).One(&room)
-	if err != nil {
-		panic(err)
+	if err != nil { // channel not found
+		log.Printf("Creating new channel %s ...", vars["channel"])
+		// create new channel
+		room.Id = bson.NewObjectId()
+		room.Name = vars["channel"]
+		room.Level = "0"
+		room.Active = "true"
+		err := c.Insert(room)
+		if err != nil {
+			log.Println(err)
+		} else {
+			// new welcome message for the room
+			welcomeMessage := Message{
+				MessageId:    bson.NewObjectId(),
+				Text:         "Welcome to this new channel",
+				ChatRoomName: vars["channel"],
+				UserName:     "Moderator",
+				ChatRoomId:   room.Id,
+			}
+			room.Messages = append(room.Messages, welcomeMessage.MessageId)
+			// insert the new welcome message into the messages
+			// collection, with this chatroom id and the user id
+			err = m.Insert(welcomeMessage)
+			if err != nil {
+				panic(err) // error inserting
+			}
+		}
+	} else { // channel found
+		log.Println("Channel found!")
 	}
 	// initialize a slice of size messageAmount to store the messages
 	var messageSlice []Message
-	// change collection
-	m := session.DB("views").C("messages")
 	// find all the messages in this chatroom
-	err = m.Find(bson.M{"_id": bson.M{"$in": room.Messages}}).All(&messageSlice)
+	err = m.Find(bson.M{"chatRoomId": room.Id}).All(&messageSlice)
 	// get json
 	js, err := json.Marshal(messageSlice)
 	if err != nil {
@@ -99,37 +124,14 @@ func serveChannelHistory(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	flag.Parse()
+	r := mux.NewRouter()
 	hub := newHub()
 	go hub.run()
-	r := mux.NewRouter()
-	// connect to the database
-	session, err := mgo.Dial("127.0.0.1")
-	// if there is an error, panic
-	if err != nil {
-		panic(err)
-	}
-	// close the session after serving
-	defer session.Close()
-	session.SetMode(mgo.Monotonic, true)
-	// clear the messages collection
-	c := session.DB("views").C("messages")
-	// err = c.DropCollection()
-	// Instantiate a new welcome message
-	firstMessage := Message{
-		bson.NewObjectId(),    // message id
-		"Welcome to the chat", // message text
-		"Roberto",             // user id
-		bson.NewObjectId(),    // chatroom id (general)
-	}
-	// insert the welcome message
-	err = c.Insert(&firstMessage)
-	if err != nil {
-		panic(err)
-	}
 	r.HandleFunc("/", serveIndex)
 	// fetch this payload when loading the chat client from web/mobile
 	r.HandleFunc("/history/{channel}", serveChannelHistory)
 	r.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Serving websocket")
 		serveWs(hub, w, r)
 	})
 	srv := &http.Server{
@@ -139,7 +141,7 @@ func main() {
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}
-	err = srv.ListenAndServe()
+	err := srv.ListenAndServe()
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
