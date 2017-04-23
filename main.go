@@ -35,6 +35,7 @@ type Message struct {
 	UserName     string        `bson:"name" json:"name"`
 	ChatRoomName string        `bson:"room_name" json:"room_name"`
 	ChatRoomId   bson.ObjectId `bson:"chatRoomId,omitempty" json:"chatRoomId,omitempty"`
+	Timestamp    time.Time     `bson:"timestamp,omitempty" json:"timestamp,omitempty"`
 }
 
 var addr = flag.String("addr", ":9000", "http service address")
@@ -92,6 +93,7 @@ func serveChannelHistory(w http.ResponseWriter, r *http.Request) {
 				ChatRoomName: vars["channel"],
 				UserName:     "Moderator",
 				ChatRoomId:   room.Id,
+				Timestamp:    time.Now(),
 			}
 			room.Messages = append(room.Messages, welcomeMessage.MessageId)
 			// insert the new welcome message into the messages
@@ -107,7 +109,7 @@ func serveChannelHistory(w http.ResponseWriter, r *http.Request) {
 	// initialize a slice of size messageAmount to store the messages
 	var messageSlice []Message
 	// find all the messages in this chatroom
-	err = m.Find(bson.M{"chatRoomId": room.Id}).All(&messageSlice)
+	err = m.Find(bson.M{"chatRoomId": room.Id}).Sort("-timestamp").All(&messageSlice)
 	// get json
 	js, err := json.Marshal(messageSlice)
 	if err != nil {
@@ -131,7 +133,6 @@ func main() {
 	// fetch this payload when loading the chat client from web/mobile
 	r.HandleFunc("/history/{channel}", serveChannelHistory)
 	r.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Serving websocket")
 		serveWs(hub, w, r)
 	})
 	srv := &http.Server{

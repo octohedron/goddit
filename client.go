@@ -83,13 +83,14 @@ func (c *Client) readPump() {
 		// log.Println(string(message[:]))
 		saveMessage(&msg)
 		// make hub broadcast the message
-		// c.hub.broadcast <- message
-		c.hub.broadcast <- []byte(msg.UserName + ": " + msg.Text)
+		c.hub.broadcast <- message // broadcast the json
+		// c.hub.broadcast <- []byte(msg.UserName + ": " + msg.Text)
 	}
 }
 
 func saveMessage(message *Message) {
 	message.MessageId = bson.NewObjectId()
+	message.Timestamp = time.Now()
 	// save message
 	// connect to the database
 	session, err := mgo.Dial("127.0.0.1")
@@ -136,7 +137,7 @@ func saveMessage(message *Message) {
 	var messageSlice []Message
 	var bsonMessageSlice []bson.ObjectId
 	// find all the messages that have this room as chatRoomId
-	err = m.Find(bson.M{"chatRoomId": room.Id}).All(&messageSlice)
+	err = m.Find(bson.M{"chatRoomId": room.Id}).Sort("-timestamp").All(&messageSlice)
 	if err != nil {
 		panic(err)
 	}
