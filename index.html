@@ -15,10 +15,15 @@ window.onload = function () {
         response.json().then(function(json) {
             for (var i = 0; i < json.length; i++) {
                 var item = document.createElement("div");
-                var message = json[i].name 
+                var message = json[i];
+                if (message.level !== 0) {
+                    item.setAttribute("style", "color:red;");
+                } else {
+                    item.setAttribute("style", "color:blue;"); // "my" message
+                }
+                item.innerText = message.name 
                     ? json[i].name + ': ' + json[i].text
                     : json[i].text;
-                item.innerText = message;
                 appendLog(item);
             }
         });
@@ -55,6 +60,7 @@ window.onload = function () {
             name: nick.value || 'Anonymous',
             room_name: roomName,
             chatRoomId: '',
+            level: 1
         };
         // console.log(json);
         console.log(JSON.stringify(json));
@@ -74,9 +80,14 @@ window.onload = function () {
             var message = JSON.parse(evt.data);
             // var messages = evt.data.split('\n');
             // for (var i = 0; i < messages.length; i++) {
-                var item = document.createElement("div");
-                item.innerText = message.name + ': ' + message.text;
-                appendLog(item);
+            var item = document.createElement("div");
+            if (message.level !== 0) {
+                item.setAttribute("style", "color:red;");
+            } else {
+                item.setAttribute("style", "color:blue;"); // "my" message
+            }
+            item.innerText = message.name + ': ' + message.text;
+            appendLog(item);
             // }
         };
     } else {

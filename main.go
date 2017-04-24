@@ -31,6 +31,7 @@ type Chatroom struct {
 
 type Message struct {
 	MessageId    bson.ObjectId `bson:"_id,omitempty" json:"_id,omitempty" inline`
+	Level        int           `bson:"level" json:"level"`
 	Text         string        `bson:"text" json:"text"`
 	UserName     string        `bson:"name" json:"name"`
 	ChatRoomName string        `bson:"room_name" json:"room_name"`
@@ -94,6 +95,7 @@ func serveChannelHistory(w http.ResponseWriter, r *http.Request) {
 				UserName:     "Moderator",
 				ChatRoomId:   room.Id,
 				Timestamp:    time.Now(),
+				Level:        1, // level = power
 			}
 			room.Messages = append(room.Messages, welcomeMessage.MessageId)
 			// insert the new welcome message into the messages
