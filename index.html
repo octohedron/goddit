@@ -4,45 +4,51 @@
 <title>Hello hello</title>
 <script type="text/javascript">
 window.onload = function () {
-    // 
-    // load the previous messages in the view from /history...
-    // 
-    var roomName = 'devs2';
-    fetch('http://192.168.1.43:9000/history/' + roomName, {
-        method: 'get'
-    }).then(function(response) {
-        console.log('loaded the history/'+ roomName + ' channel history');
-        response.json().then(function(json) {
-            for (var i = 0; i < json.length; i++) {
-                var item = document.createElement("div");
-                var message = json[i];
-                if (message.level !== 0) {
-                    item.setAttribute("style", "color:red;");
-                } else {
-                    item.setAttribute("style", "color:blue;"); // "my" message
-                }
-                item.innerText = message.name 
-                    ? json[i].name + ': ' + json[i].text
-                    : json[i].text;
-                appendLog(item);
-            }
-        });
-    }).catch(function(err) {
-        console.log(err);
-    });
     var conn;
     var msg = document.getElementById("msg");
     var nick = document.getElementById("nick");
     var log = document.getElementById("log");
-
+    var select = document.getElementById("room");
+    var startRoom = 'devs2';
+    function loadHistory (room) {
+        // clear the room messages first
+        while (log.hasChildNodes()) {
+            log.removeChild(log.lastChild);
+        }
+        fetch('http://192.168.1.43:9000/history/' + room, {
+            method: 'get'
+        }).then(function(response) {
+            console.log('loaded the history/'+ room + ' channel history');
+            response.json().then(function(json) {
+                for (var i = 0; i < json.length; i++) {
+                    var item = document.createElement("div");
+                    var message = json[i];
+                    if (message.level !== 0) {
+                        item.setAttribute("style", "color:red;");
+                    } else {
+                        item.setAttribute("style", "color:blue;"); // "my" message
+                    }
+                    item.innerText = message.name 
+                        ? json[i].name + ': ' + json[i].text
+                        : json[i].text;
+                    // log.appendChild(item);
+                    appendLog(item);
+                }
+            });
+        }).catch(function(err) {
+            console.log(err);
+        });
+    }
     function appendLog(item) {
         var doScroll = log.scrollTop > log.scrollHeight - log.clientHeight - 1;
-        log.appendChild(item);
+        // log.appendChild(item);
+        let firstChild = log.firstChild;
+        log.insertBefore(item, firstChild);
         if (doScroll) {
             log.scrollTop = log.scrollHeight - log.clientHeight;
         }
     }
-
+    loadHistory(startRoom);
     document.getElementById("form").onsubmit = function () {
         console.log('submit pressed!');
         if (!conn) {
@@ -58,7 +64,7 @@ window.onload = function () {
             _id: '',
             text: msg.value, 
             name: nick.value || 'Anonymous',
-            room_name: roomName,
+            room_name: select.value || startRoom,
             chatRoomId: '',
             level: 1
         };
@@ -74,7 +80,8 @@ window.onload = function () {
         conn.onclose = function (evt) {
             var item = document.createElement("div");
             item.innerHTML = "<b>Connection closed.</b>";
-            appendLog(item);
+            // appendLog(item);
+            log.appendChild(item);
         };
         conn.onmessage = function (evt) {
             var message = JSON.parse(evt.data);
@@ -87,14 +94,21 @@ window.onload = function () {
                 item.setAttribute("style", "color:blue;"); // "my" message
             }
             item.innerText = message.name + ': ' + message.text;
-            appendLog(item);
+            // appendLog(item);
+            log.appendChild(item);
             // }
         };
     } else {
         var item = document.createElement("div");
         item.innerHTML = "<b>Your browser does not support WebSockets.</b>";
-        appendLog(item);
+        log.appendChild(item);
+        // appendLog(item);
     }
+
+    select.addEventListener("change", function(e) {
+        e.preventDefault();
+        loadHistory(select.value);
+    }, false);
 };
 </script>
 <style type="text/css">
@@ -141,6 +155,14 @@ body {
     <input type="submit" value="Send" />
     <input type="text" id="msg" size="64"/>
     Nick: <input type="text" id="nick" size="30"/>
+    Chatroom:
+    <select id="room">
+      <option value="devs1">devs1</option>
+      <option value="volvo">Volvo</option>
+      <option value="saab">Saab</option>
+      <option value="mercedes">Mercedes</option>
+      <option value="audi">Audi</option>
+    </select>
 </form>
 </body>
 </html>
