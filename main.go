@@ -47,7 +47,6 @@ const project_root = "/home/vagrant/GO/chat"
  * Chat channel
  */
 func serveIndex(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.URL)
 	// serve
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", 405)
@@ -61,7 +60,6 @@ func serveIndex(w http.ResponseWriter, r *http.Request) {
  * Load the previous messages from this channel from the database
  */
 func serveChannelHistory(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.URL)
 	vars := mux.Vars(r)
 	// connect to the database
 	session, err := mgo.Dial("127.0.0.1")
@@ -77,7 +75,7 @@ func serveChannelHistory(w http.ResponseWriter, r *http.Request) {
 	// find the chatroom at this request
 	err = c.Find(bson.M{"name": vars["channel"]}).One(&room)
 	if err != nil { // channel not found
-		log.Printf("Creating new channel %s ...", vars["channel"])
+		log.Printf("Creating new channel: %s ...", vars["channel"])
 		// create new channel
 		room.Id = bson.NewObjectId()
 		room.Name = vars["channel"]
@@ -106,12 +104,13 @@ func serveChannelHistory(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else { // channel found
-		log.Println("Channel found!")
+		log.Printf("Found history for channel: %s \n", vars["channel"])
 	}
 	// initialize a slice of size messageAmount to store the messages
 	var messageSlice []Message
 	// find all the messages in this chatroom
 	err = m.Find(bson.M{"chatRoomId": room.Id}).Sort("-timestamp").All(&messageSlice)
+	log.Printf("Messages in the channel: %d \n", len(messageSlice))
 	// get json
 	js, err := json.Marshal(messageSlice)
 	if err != nil {
@@ -134,7 +133,7 @@ func main() {
 	r.HandleFunc("/", serveIndex)
 	// fetch this payload when loading the chat client from web/mobile
 	r.HandleFunc("/history/{channel}", serveChannelHistory)
-	r.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/room/{channel}", func(w http.ResponseWriter, r *http.Request) {
 		serveWs(hub, w, r)
 	})
 	srv := &http.Server{

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -38,6 +39,10 @@ var upgrader = websocket.Upgrader{
 
 // Client is a middleman between the websocket connection and the hub.
 type Client struct {
+	// the rooms this client belongs to
+	room string
+
+	// a reference to the hub
 	hub *Hub
 
 	// The websocket connection.
@@ -89,16 +94,16 @@ func (c *Client) readPump() {
 }
 
 func saveMessage(message *Message) {
-	message.MessageId = bson.NewObjectId()
-	message.Timestamp = time.Now()
-	// save message
 	// connect to the database
 	session, err := mgo.Dial("127.0.0.1")
 	if err != nil {
 		panic(err)
 	}
-	// close the session when done
 	defer session.Close()
+	// set message id and creation date
+	message.MessageId = bson.NewObjectId()
+	message.Timestamp = time.Now()
+	// close the session when done
 	session.SetMode(mgo.Monotonic, true)
 	// select the collections to work with
 	c := session.DB("views").C("chatrooms")
@@ -124,7 +129,7 @@ func saveMessage(message *Message) {
 			log.Println(room.Messages)
 		}
 	} else { // channel found
-		fmt.Println("Channel found!")
+		fmt.Printf("Found channel: %s \n", message.ChatRoomName)
 	}
 	// construct the new message
 	message.ChatRoomId = room.Id
@@ -142,7 +147,7 @@ func saveMessage(message *Message) {
 		panic(err)
 	}
 	if len(messageSlice) > 0 {
-		fmt.Println("Found messages in the chatroom")
+		fmt.Printf("Found %d messages in: %s \n", len(messageSlice), message.ChatRoomName)
 		if err != nil {
 			log.Println(err)
 		}
@@ -178,6 +183,7 @@ func (c *Client) writePump() {
 	for {
 		select {
 		case message, ok := <-c.send:
+			// add 10 sec for writing as a deadline
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel.
@@ -190,14 +196,12 @@ func (c *Client) writePump() {
 				return
 			}
 			w.Write(message)
-
 			// Add queued chat messages to the current websocket message.
 			n := len(c.send)
 			for i := 0; i < n; i++ {
 				w.Write(newline)
 				w.Write(<-c.send)
 			}
-
 			if err := w.Close(); err != nil {
 				return
 			}
@@ -212,12 +216,19 @@ func (c *Client) writePump() {
 
 // serveWs handles websocket requests from the peer.
 func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	log.Printf("Websocket for room: %s \n", vars["channel"])
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	client := &Client{hub: hub, conn: conn, send: make(chan []byte, 256)}
+	client := &Client{
+		room: vars["channel"],
+		hub:  hub,
+		conn: conn,
+		send: make(chan []byte, 256),
+	}
 	client.hub.register <- client
 	go client.writePump()
 	client.readPump()
