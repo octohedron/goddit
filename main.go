@@ -87,14 +87,21 @@ func serveChat(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("chatterbot")
 	if err != nil {
 		log.Println(err)
+		template.Must(
+			template.New("chat.html").ParseFiles(
+				project_root+"/chat.html")).Execute(w, struct {
+			Username string
+		}{"Error getting your cookie"})
+	} else {
+		log.Println(cookie.Value)
+		user := users[cookie.Value]
+		template.Must(
+			template.New("chat.html").ParseFiles(
+				project_root+"/chat.html")).Execute(w, struct {
+			Username string
+		}{user.Name})
 	}
-	log.Printf("%s", cookie.Value)
-	user := users[cookie.Value]
-	template.Must(
-		template.New("chat.html").ParseFiles(
-			project_root+"/chat.html")).Execute(w, struct {
-		Username string
-	}{user.Name})
+
 }
 
 func serveIndex(w http.ResponseWriter, r *http.Request) {
@@ -119,21 +126,19 @@ func serveRedditCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	authData := getRedditAuth(r.FormValue("code"))
 	user := getRedditUserData(authData)
+	log.Println(user.Name)
 	user.Auth = authData
 	// store reddit auth data in the map, Username -> RedditAuth data
 	users[user.Name] = *user
 	// redirect to the chat
 	cookie := &http.Cookie{
-		Name:     "chatterbot",
-		Value:    user.Name,
-		Path:     serverAddress,
-		Expires:  time.Now().Add(time.Hour * 720),
-		MaxAge:   0,
-		Secure:   true,
-		HttpOnly: true,
+		Name:  "chatterbot",
+		Value: user.Name,
+		Path:  "/chat",
 	}
 	http.SetCookie(w, cookie)
-	http.Redirect(w, r, serverAddress+"/chat", 200)
+	log.Println("Redirecting to /chat")
+	http.Redirect(w, r, serverAddress+"/chat", 302)
 }
 
 func getRedditUserData(auth RedditAuth) *User {
@@ -155,7 +160,6 @@ func getRedditUserData(auth RedditAuth) *User {
 	if err != nil {
 		log.Println(err)
 	}
-	log.Println(string(body[:]))
 	return &user
 }
 
@@ -176,7 +180,7 @@ func getRedditAuth(code string) RedditAuth {
 	}
 	redditAuth := RedditAuth{}
 	body, err := ioutil.ReadAll(res.Body)
-	log.Printf("BODY: \n \n %s", string(body[:]))
+	// log.Printf("BODY: \n %s", string(body[:]))
 	err = json.Unmarshal(body, &redditAuth)
 	log.Printf("Access token: %s", redditAuth.Access_token)
 	return redditAuth
