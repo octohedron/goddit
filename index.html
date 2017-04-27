@@ -1,19 +1,39 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<title>Welcome aboard</title>
-<style type="text/css">
-body {
-	overflow: hidden;
-	padding: 0;
-	margin: 0;
-	width: 100%;
-	height: 100%;
-	background: gray;
-}
-</style>
+    <title>Welcome aboard</title>
+    <script type="text/javascript">
+    window.onload = function () {
+  		document.getElementById("form").onsubmit = function (e) {
+  			e.preventDefault();
+  			window.location = "{{.Url}}";
+			};
+		};
+    </script>
+    <style type="text/css">
+        html {
+            overflow: hidden;
+        }
+        body {
+            overflow: hidden;
+            padding: 0;
+            margin: 0;
+            width: 100%;
+            height: 100%;
+            background: gray;
+        }
+        #form {
+            padding: 0 0.5em 0 0.5em;
+            margin: 0;
+        }
+    </style>
 </head>
+
 <body>
-<a href="{{.Url}}">Authenticate with reddit!</a>
+    <form id="form">
+        <input type="submit" value="Authenticate with reddit!" />
+    </form>
 </body>
+
 </html>

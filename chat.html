@@ -151,12 +151,11 @@ body {
 </head>
 <body>
 <p> Thank you for authenticating with reddit </p>
-<p> Your access token: {{.Token}} </p>
 <div id="log"></div>
 <form id="form">
 	<input type="submit" value="Send" />
 	<input type="text" id="msg" size="64"/>
-	Nick: <input type="text" id="nick" size="30"/>
+	Nick: <input type="text" id="nick" size="30" value="{{.Username}}"/>
 	Chatroom:
 	<select id="room">
 	  <option value="devs">devs</option>

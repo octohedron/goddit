@@ -13,13 +13,12 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"strings"
 	"time"
 )
 
 const (
-	CLIENT_ID     = "1x83QLDFHequ8w"
-	CLIENT_SECRET = "A9R-RZ0kuflGvhR0LJoRYVa9vRE"
+	CLIENT_ID     = "5ao8tf2OzcUFJg"
+	CLIENT_SECRET = "yeRLdTb3oN6giRbbMs7Tmvm5sYk"
 	REDIRECT_URI  = "http://192.168.1.43:9000/reddit_callback"
 	letterBytes   = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	letterIdxBits = 6                    // 6 bits to represent a letter index
@@ -28,11 +27,21 @@ const (
 )
 
 type User struct {
-	Name             string `bson:"name" json:"name"`
-	Level            string `bson:"level" json:"level"`
-	Active           string `bson:"active" json:"active"`
-	Activation_token string `bson:"activation_token" json:"activation_token"`
-	Created_at       string `bson:"created_at" json:"created_at"`
+	Comment_karma    int     `json:"comment_karma"`
+	Created          float32 `json:"created"`
+	Created_utc      float32 `json:"created_utc"`
+	Has_mail         bool    `json:"has_mail"`
+	Has_mod_mail     bool    `json:"has_mod_mail"`
+	Id               string  `json:"id"`
+	Is_gold          bool    `json:"is_gold"`
+	Is_mod           bool    `json:"is_mod"`
+	Link_karma       int     `json:"link_karma"`
+	Over_18          bool    `json:"over_18"`
+	Name             string  `bson:"name" json:"name"`
+	Level            string  `bson:"level" json:"level"`
+	Active           string  `bson:"active" json:"active"`
+	Activation_token string  `bson:"activation_token" json:"activation_token"`
+	Created_at       string  `bson:"created_at" json:"created_at"`
 	Auth             RedditAuth
 }
 
@@ -58,32 +67,34 @@ type Message struct {
 }
 
 type RedditAuth struct {
-	access_token string
-	token_type   string
-	expires_in   int
-	scope        string
+	Access_token string `json:"access_token"`
+	Token_type   string `json:"token_type"`
+	Expires_in   int    `json:"expires_in"`
+	Scope        string `json:"scope"`
 }
 
-var serverAddress = "http://192.168.1.43:9000/"
+var serverAddress = "http://192.168.1.43:9000"
 
 var addr = flag.String("addr", ":9000", "http service address")
 
 const project_root = "/home/vagrant/GO/chat"
 
-/**
- * Chat channel
- */
 func serveChat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", 405)
 		return
 	}
-
+	cookie, err := r.Cookie("chatterbot")
+	if err != nil {
+		log.Println(err)
+	}
+	log.Printf("%s", cookie.Value)
+	user := users[cookie.Value]
 	template.Must(
 		template.New("chat.html").ParseFiles(
 			project_root+"/chat.html")).Execute(w, struct {
-		Token string
-	}{accessToken})
+		Username string
+	}{user.Name})
 }
 
 func serveIndex(w http.ResponseWriter, r *http.Request) {
@@ -95,8 +106,6 @@ func serveIndex(w http.ResponseWriter, r *http.Request) {
 	url := "https://ssl.reddit.com/api/v1/authorize?" + "client_id=" + CLIENT_ID +
 		"&response_type=code&state=" + state + "&redirect_uri=" +
 		REDIRECT_URI + "&duration=temporary&scope=identity"
-	log.Println(url)
-	// t, _ := template.ParseFiles(project_root + "/index.html")
 	template.Must(template.New("index.html").ParseFiles(
 		project_root+"/index.html")).Execute(w, struct {
 		Url string
@@ -104,37 +113,61 @@ func serveIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func serveRedditCallback(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
-		http.Error(w, "Method not allowed", 405)
-		return
-	}
-	log.Println(r.URL)
 	err := r.FormValue("error")
-	log.Println("err: " + err)
-	state := r.FormValue("state")
-	log.Println("state: " + state)
-	code := r.FormValue("code")
-	log.Println("code: " + code)
-	accessToken := getToken(code)
-
-	// store reddit auth data in the map
-	log.Println("accessToken: " + accessToken)
+	if err != "" {
+		log.Println(err)
+	}
+	authData := getRedditAuth(r.FormValue("code"))
+	user := getRedditUserData(authData)
+	user.Auth = authData
+	// store reddit auth data in the map, Username -> RedditAuth data
+	users[user.Name] = *user
 	// redirect to the chat
-	http.Redirect(w, r, serverAddress, 200)
+	cookie := &http.Cookie{
+		Name:     "chatterbot",
+		Value:    user.Name,
+		Path:     serverAddress,
+		Expires:  time.Now().Add(time.Hour * 720),
+		MaxAge:   0,
+		Secure:   true,
+		HttpOnly: true,
+	}
+	http.SetCookie(w, cookie)
+	http.Redirect(w, r, serverAddress+"/chat", 200)
 }
 
-func getToken(code string) string {
+func getRedditUserData(auth RedditAuth) *User {
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", "https://oauth.reddit.com/api/v1/me", nil)
+	if err != nil {
+		log.Println(err)
+	}
+	req.Header.Set("User-agent", "Web 1x83QLDFHequ8w 1.9.3 (by /u/SEND_ME_RARE_PEPES)")
+	req.Header.Add("Authorization", "bearer "+auth.Access_token)
+	res, err := client.Do(req)
+	if err != nil {
+		log.Println(err)
+	}
+	defer res.Body.Close()
+	user := User{}
+	body, err := ioutil.ReadAll(res.Body)
+	err = json.Unmarshal(body, &user)
+	if err != nil {
+		log.Println(err)
+	}
+	log.Println(string(body[:]))
+	return &user
+}
+
+func getRedditAuth(code string) RedditAuth {
 	client := &http.Client{}
 	req, err := http.NewRequest("POST",
 		"https://ssl.reddit.com/api/v1/access_token",
 		bytes.NewBufferString(
 			"grant_type=authorization_code&code="+code+"&redirect_uri="+REDIRECT_URI))
-	req.Header.Add("User-agent", "Reddit-chatterbots")
+	req.Header.Add("User-agent", "Web 1x83QLDFHequ8w 1.9.3 (by /u/SEND_ME_RARE_PEPES)")
 	encoded := base64.StdEncoding.EncodeToString(
 		[]byte(CLIENT_ID + ":" + CLIENT_SECRET))
-	// authString = base64.encodestring()
-	// headers = {'Authorization':"Basic %s" % authString}
-	log.Println(encoded)
 	req.Header.Add("Authorization", "Basic "+encoded)
 	res, err := client.Do(req)
 	defer res.Body.Close()
@@ -142,9 +175,11 @@ func getToken(code string) string {
 		log.Fatal(err)
 	}
 	redditAuth := RedditAuth{}
-	err = json.Unmarshal(res.Body, &redditAuth)
-	log.Printf("%v", redditAuth)
-	return string(redditAuth.access_token)
+	body, err := ioutil.ReadAll(res.Body)
+	log.Printf("BODY: \n \n %s", string(body[:]))
+	err = json.Unmarshal(body, &redditAuth)
+	log.Printf("Access token: %s", redditAuth.Access_token)
+	return redditAuth
 }
 
 /**
