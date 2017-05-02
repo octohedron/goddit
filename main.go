@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"flag"
+	"github.com/elgs/gojq"
 	"github.com/gorilla/mux"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -13,17 +14,19 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"strconv"
 	"time"
 )
 
 const (
-	CLIENT_ID     = "5ao8tf2OzcUFJg"
-	CLIENT_SECRET = "yeRLdTb3oN6giRbbMs7Tmvm5sYk"
-	REDIRECT_URI  = "http://192.168.1.43:9000/reddit_callback"
-	letterBytes   = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	letterIdxBits = 6                    // 6 bits to represent a letter index
-	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
-	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
+	CLIENT_ID      = "5ao8tf2OzcUFJg"
+	CLIENT_SECRET  = "yeRLdTb3oN6giRbbMs7Tmvm5sYk"
+	SERVER_ADDRESS = "http://192.168.1.43:9000"
+	REDIRECT_URI   = SERVER_ADDRESS + "/reddit_callback"
+	letterBytes    = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	letterIdxBits  = 6                    // 6 bits to represent a letter index
+	letterIdxMask  = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
+	letterIdxMax   = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
 )
 
 type User struct {
@@ -48,12 +51,12 @@ type User struct {
 var users map[string]User
 
 type Chatroom struct {
-	Id         bson.ObjectId   `bson:"_id,omitempty" json:"_id,omitempty" inline`
-	Name       string          `bson:"name" json:"name"`
-	Level      string          `bson:"level" json:"level"`
-	Active     string          `bson:"active" json:"active"`
-	Created_at string          `bson:"created_at" json:"created_at"`
-	Messages   []bson.ObjectId `bson:"messages,omitempty" json:"messages" inline`
+	Id        bson.ObjectId   `bson:"_id,omitempty" json:"_id,omitempty" inline`
+	Name      string          `bson:"name" json:"name"`
+	Level     string          `bson:"level" json:"level"`
+	Active    string          `bson:"active" json:"active"`
+	Timestamp time.Time       `bson:"timestamp,omitempty" json:"timestamp,omitempty"`
+	Messages  []bson.ObjectId `bson:"messages,omitempty" json:"messages" inline`
 }
 
 type Message struct {
@@ -73,7 +76,10 @@ type RedditAuth struct {
 	Scope        string `json:"scope"`
 }
 
-var serverAddress = "http://192.168.1.43:9000"
+// type RedditSubreddit struct {
+// 	Id           bson.ObjectId `bson:"_id,omitempty" json:"_id,omitempty" inline`
+// 	Display_name string        `bson:"display_name,omitempty" json:"display_name,omitempty" inline`
+// }
 
 var addr = flag.String("addr", ":9000", "http service address")
 
@@ -84,22 +90,42 @@ func serveChat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", 405)
 		return
 	}
-	cookie, err := r.Cookie("chatterbot")
+	// connect to the database
+	session, err := mgo.Dial("127.0.0.1")
 	if err != nil {
+		panic(err)
+	}
+	// close the session when done
+	defer session.Close()
+	session.SetMode(mgo.Monotonic, true)
+	c := session.DB("views").C("chatrooms")
+	// find all subreddits
+	var Rooms []Chatroom
+	err = c.Find(nil).All(&Rooms)
+	if err != nil {
+		log.Println(err)
+		panic(err)
+	} else {
+		log.Printf("Found chatrooms: %d \n", len(Rooms))
+	}
+	cookie, err := r.Cookie("chatterbot")
+	if err != nil { // i.e. cookie not found
 		log.Println(err)
 		template.Must(
 			template.New("chat.html").ParseFiles(
 				project_root+"/chat.html")).Execute(w, struct {
-			Username string
-		}{"Error getting your cookie"})
+			Username  string
+			Chatrooms []Chatroom
+		}{"Error getting your cookie", Rooms})
 	} else {
-		log.Println(cookie.Value)
+		log.Println("Found cookie value " + cookie.Value)
 		user := users[cookie.Value]
 		template.Must(
 			template.New("chat.html").ParseFiles(
 				project_root+"/chat.html")).Execute(w, struct {
-			Username string
-		}{user.Name})
+			Username  string
+			Chatrooms []Chatroom
+		}{user.Name, Rooms})
 	}
 
 }
@@ -109,14 +135,21 @@ func serveIndex(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", 405)
 		return
 	}
-	state := getRandomString(8)
-	url := "https://ssl.reddit.com/api/v1/authorize?" + "client_id=" + CLIENT_ID +
-		"&response_type=code&state=" + state + "&redirect_uri=" +
-		REDIRECT_URI + "&duration=temporary&scope=identity"
-	template.Must(template.New("index.html").ParseFiles(
-		project_root+"/index.html")).Execute(w, struct {
-		Url string
-	}{url})
+	cookie, err := r.Cookie("chatterbot")
+	if err != nil { // i.e. cookie not found
+		state := getRandomString(8)
+		url := "https://ssl.reddit.com/api/v1/authorize?" + "client_id=" +
+			CLIENT_ID + "&response_type=code&state=" + state + "&redirect_uri=" +
+			REDIRECT_URI + "&duration=temporary&scope=identity"
+		template.Must(template.New("index.html").ParseFiles(
+			project_root+"/index.html")).Execute(w, struct {
+			Url string
+		}{url})
+	} else {
+		log.Println("Found cookie " + cookie.Value)
+		http.Redirect(w, r, SERVER_ADDRESS+"/chat", 302)
+	}
+
 }
 
 func serveRedditCallback(w http.ResponseWriter, r *http.Request) {
@@ -130,15 +163,23 @@ func serveRedditCallback(w http.ResponseWriter, r *http.Request) {
 	user.Auth = authData
 	// store reddit auth data in the map, Username -> RedditAuth data
 	users[user.Name] = *user
-	// redirect to the chat
+	expire := time.Now().AddDate(0, 0, 1)
 	cookie := &http.Cookie{
-		Name:  "chatterbot",
-		Value: user.Name,
-		Path:  "/chat",
+		Expires: expire,
+		MaxAge:  86400,
+		Name:    "chatterbot",
+		Value:   user.Name,
+		Path:    "/chat",
+		Domain:  "192.168.1.43",
 	}
+	log.Println("Setting cookie " + user.Name)
+	// header := &http.Header{
+	// 	"Access-Control-Allow-Credential": "true"
+	// }
+	// http.Header.Set(w.Header(), "Access-Control-Allow-Credential", "true")
 	http.SetCookie(w, cookie)
 	log.Println("Redirecting to /chat")
-	http.Redirect(w, r, serverAddress+"/chat", 302)
+	http.Redirect(w, r, SERVER_ADDRESS+"/chat", 302)
 }
 
 func getRedditUserData(auth RedditAuth) *User {
@@ -147,13 +188,13 @@ func getRedditUserData(auth RedditAuth) *User {
 	if err != nil {
 		log.Println(err)
 	}
-	req.Header.Set("User-agent", "Web 1x83QLDFHequ8w 1.9.3 (by /u/SEND_ME_RARE_PEPES)")
+	req.Header.Set("User-agent",
+		"Web 1x83QLDFHequ8w 1.9.3 (by /u/SEND_ME_RARE_PEPES)")
 	req.Header.Add("Authorization", "bearer "+auth.Access_token)
 	res, err := client.Do(req)
 	if err != nil {
 		log.Println(err)
 	}
-	defer res.Body.Close()
 	user := User{}
 	body, err := ioutil.ReadAll(res.Body)
 	err = json.Unmarshal(body, &user)
@@ -163,13 +204,76 @@ func getRedditUserData(auth RedditAuth) *User {
 	return &user
 }
 
+func getPopularSubreddits() {
+	// log.Println("Getting subreddit data")
+	client := &http.Client{}
+	req, err := http.NewRequest("GET",
+		"https://www.reddit.com/subreddits/popular/.json", nil)
+	if err != nil {
+		log.Println(err)
+	}
+	req.Header.Set("User-agent",
+		"Web 1x83QLDFHequ8w 1.9.3 (by /u/SEND_ME_RARE_PEPES)")
+	res, err := client.Do(req)
+	if err != nil {
+		log.Println(err)
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	parser, err := gojq.NewStringQuery(string(body[:]))
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	// store in mongodb
+	session, err := mgo.Dial("127.0.0.1")
+	if err != nil {
+		panic(err)
+	}
+	// close the session when done
+	defer session.Close()
+	session.SetMode(mgo.Monotonic, true)
+	c := session.DB("views").C("chatrooms")
+	bulkT := c.Bulk()
+	bulkT.Unordered() // Avoid dupes (?)
+	// Index
+	index := mgo.Index{
+		Key:        []string{"name"},
+		Unique:     true,
+		DropDups:   true,
+		Background: true,
+		Sparse:     true,
+	}
+	err = c.EnsureIndex(index)
+	for i := 0; i < 25; i++ {
+		name, err := parser.Query("data.children.[" +
+			strconv.Itoa(i) + "].data.display_name")
+		if err != nil {
+			log.Println(err)
+		}
+		subreddit := Chatroom{
+			Id:        bson.NewObjectId(),
+			Name:      name.(string),
+			Level:     "0",
+			Active:    "1",
+			Timestamp: time.Now(),
+		}
+		bulkT.Insert(subreddit)
+	}
+	// log.Printf("SUBREDDITS: \n %v \n", subreddits)
+	_, err = bulkT.Run()
+	if err != nil {
+		log.Println("Found duplicate subreddits...")
+	}
+}
+
 func getRedditAuth(code string) RedditAuth {
 	client := &http.Client{}
 	req, err := http.NewRequest("POST",
 		"https://ssl.reddit.com/api/v1/access_token",
 		bytes.NewBufferString(
 			"grant_type=authorization_code&code="+code+"&redirect_uri="+REDIRECT_URI))
-	req.Header.Add("User-agent", "Web 1x83QLDFHequ8w 1.9.3 (by /u/SEND_ME_RARE_PEPES)")
+	req.Header.Add("User-agent",
+		"Web 1x83QLDFHequ8w 1.9.3 (by /u/SEND_ME_RARE_PEPES)")
 	encoded := base64.StdEncoding.EncodeToString(
 		[]byte(CLIENT_ID + ":" + CLIENT_SECRET))
 	req.Header.Add("Authorization", "Basic "+encoded)
@@ -218,7 +322,7 @@ func serveChannelHistory(w http.ResponseWriter, r *http.Request) {
 			// new welcome message for the room
 			welcomeMessage := Message{
 				MessageId:    bson.NewObjectId(),
-				Text:         "Welcome to this new channel",
+				Text:         "Welcome to the new " + vars["channel"] + " chat",
 				ChatRoomName: vars["channel"],
 				UserName:     "Moderator",
 				ChatRoomId:   room.Id,
@@ -239,7 +343,8 @@ func serveChannelHistory(w http.ResponseWriter, r *http.Request) {
 	// initialize a slice of size messageAmount to store the messages
 	var messageSlice []Message
 	// find all the messages in this chatroom
-	err = m.Find(bson.M{"chatRoomId": room.Id}).Sort("-timestamp").All(&messageSlice)
+	err = m.Find(
+		bson.M{"chatRoomId": room.Id}).Sort("-timestamp").All(&messageSlice)
 	log.Printf("Messages in the channel: %d \n", len(messageSlice))
 	// get json
 	js, err := json.Marshal(messageSlice)
@@ -256,6 +361,8 @@ func serveChannelHistory(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// gets the subreddits and stores them in the DB
+	getPopularSubreddits()
 	// initialize the user slice
 	users = make(map[string]User)
 	flag.Parse()
@@ -266,9 +373,10 @@ func main() {
 	r.HandleFunc("/chat", serveChat)
 	r.HandleFunc("/reddit_callback", serveRedditCallback)
 	r.HandleFunc("/history/{channel}", serveChannelHistory)
-	r.HandleFunc("/room/{channel}", func(w http.ResponseWriter, r *http.Request) {
-		serveWs(hub, w, r)
-	})
+	r.HandleFunc("/room/{channel}",
+		func(w http.ResponseWriter, r *http.Request) {
+			serveWs(hub, w, r)
+		})
 	srv := &http.Server{
 		Handler: r,
 		Addr:    *addr,

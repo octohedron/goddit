@@ -10,12 +10,13 @@ window.onload = function () {
 	var log = document.getElementById("log");
 	var select = document.getElementById("room");
 	var currentRoom = 'devs';
+	var serverAddress = "http://192.168.1.43:9000/";
 	function loadHistory (room) {
 		// clear the room messages first
 		while (log.hasChildNodes()) {
 			log.removeChild(log.lastChild);
 		}
-		fetch('http://192.168.1.43:9000/history/' + room, {
+		fetch(serverAddress + "/history/" + room, {
 			method: 'get'
 		}).then(function(response) {
 			console.log('loaded the history of ' + room + ' room');
@@ -23,10 +24,14 @@ window.onload = function () {
 				for (var i = 0; i < json.length; i++) {
 					var item = document.createElement("div");
 					var message = json[i];
-					if (message.level !== 0) {
-						item.setAttribute("style", "color:red;");
-					} else {
+					if (message.name === "Moderator") {
+						item.setAttribute("style", "color:purple; font-weight: bolder");
+					} else if  (message.name === "Anonymous") {
+						item.setAttribute("style", "color:green;"); 
+					} else if  (message.name === nick.value) {
 						item.setAttribute("style", "color:blue;"); // "my" message
+					} else {
+					 	item.setAttribute("style", "color:red;"); // others message
 					}
 					item.innerText = message.name 
 						? json[i].name + ': ' + json[i].text
@@ -41,7 +46,6 @@ window.onload = function () {
 	}
 	function appendLog(item) {
 		var doScroll = log.scrollTop > log.scrollHeight - log.clientHeight - 1;
-		// log.appendChild(item);
 		let firstChild = log.firstChild;
 		log.insertBefore(item, firstChild);
 		if (doScroll) {
@@ -91,10 +95,14 @@ window.onload = function () {
 				console.log("Got message: " + message.text);
 				if(message.room_name === select.value) {
 					var item = document.createElement("div");
-					if (message.level !== 0) {
-						item.setAttribute("style", "color:red;");
-					} else {
+					if (message.name === "Moderator") {
+						item.setAttribute("style", "color:purple; font-weight: bolder");
+					} else if  (message.name === "Anonymous") {
+						item.setAttribute("style", "color:green;"); 
+					} else if  (message.name === nick.value) {
 						item.setAttribute("style", "color:blue;"); // "my" message
+					} else {
+					 	item.setAttribute("style", "color:red;"); // others messages
 					}
 					item.innerText = message.name + ': ' + message.text;
 					log.appendChild(item);
@@ -116,56 +124,36 @@ window.onload = function () {
 };
 </script>
 <style type="text/css">
-html {
-	overflow: hidden;
-}
-
-body {
-	overflow: hidden;
-	padding: 0;
-	margin: 0;
-	width: 100%;
-	height: 100%;
-	background: gray;
-}
-
-#log {
-    background: white;
-    margin: 0;
-    padding: 0.5em 0.5em 0.5em 0.5em;
-    position: relative;
-    overflow: auto;
-}
-
-#form {
-	padding: 0 0.5em 0 0.5em;
-	margin: 0;
-	position: absolute;
-	bottom: 1em;
-	left: 0px;
-	width: 100%;
-	overflow: hidden;
-}
-
+	html {
+		overflow: hidden;
+	}
+	body {
+		overflow: hidden;
+		padding: 0;
+		margin: 0;
+		width: 100%;
+		height: 100%;
+		background: gray;
+	}
+	#log {
+	    background: white;
+	    margin: 0;
+	    padding: 0.5em 0.5em 0.5em 0.5em;
+	    position: relative;
+	    overflow: auto;
+	}
+	#form {
+		padding: 0 0.5em 0 0.5em;
+		margin: 0;
+		position: absolute;
+		bottom: 1em;
+		left: 0px;
+		width: 100%;
+		overflow: hidden;
+	}
 </style>
 </head>
 <body>
 <p> Thank you for authenticating with reddit </p>
-<p>Your access token: {{.Token}}</p>
-<div id="log"></div>
-<form id="form">
-	<input type="submit" value="Send" />
-	<input type="text" id="msg" size="64"/>
-	Nick: <input type="text" id="nick" size="30"/>
-	Chatroom:
-	<select id="room">
-	  <option value="devs">devs</option>
-	  <option value="devs2">devs2</option>
-	  <option value="volvo">Volvo</option>
-	  <option value="saab">Saab</option>
-	  <option value="mercedes">Mercedes</option>
-	  <option value="audi">Audi</option>
-	</select>
-</form>
 </body>
 </html>
