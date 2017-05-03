@@ -142,12 +142,14 @@ func saveMessage(message *Message) {
 	var messageSlice []Message
 	var bsonMessageSlice []bson.ObjectId
 	// find all the messages that have this room as chatRoomId
-	err = m.Find(bson.M{"chatRoomId": room.Id}).Sort("-timestamp").All(&messageSlice)
+	err = m.Find(
+		bson.M{"chatRoomId": room.Id}).Sort("-timestamp").All(&messageSlice)
 	if err != nil {
 		panic(err)
 	}
 	if len(messageSlice) > 0 {
-		fmt.Printf("Found %d messages in: %s \n", len(messageSlice), message.ChatRoomName)
+		fmt.Printf("Found %d messages in: %s \n",
+			len(messageSlice), message.ChatRoomName)
 		if err != nil {
 			log.Println(err)
 		}
@@ -207,7 +209,8 @@ func (c *Client) writePump() {
 			}
 		case <-ticker.C:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-			if err := c.conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
+			if err := c.conn.WriteMessage(websocket.PingMessage,
+				[]byte{}); err != nil {
 				return
 			}
 		}

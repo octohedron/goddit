@@ -1,131 +1,134 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<title>Welcome to reddit chat</title>
-<script type="text/javascript">
-window.onload = function () {
-	var conn;
-	var msg = document.getElementById("msg");
-	var nick = document.getElementById("nick");
-	var log = document.getElementById("log");
-	var select = document.getElementById("room");
-	var currentRoom = 'AskReddit';
-	var serverAddress = "http://192.168.1.43:9000/";
-	function loadHistory (room) {
-		// clear the room messages first
-		while (log.hasChildNodes()) {
-			log.removeChild(log.lastChild);
-		}
-		fetch(serverAddress + "/history/" + room, {
-			method: 'get'
-		}).then(function(response) {
-			console.log('loaded the history of ' + room + ' room');
-			response.json().then(function(json) {
-				for (var i = 0; i < json.length; i++) {
-					var item = document.createElement("div");
-					var message = json[i];
-					if (message.name === "Moderator") {
-						item.setAttribute("style", "color:purple; font-weight: bolder");
-					} else if  (message.name === "Anonymous") {
-						item.setAttribute("style", "color:green;"); 
-					} else if  (message.name === nick.value) {
-						item.setAttribute("style", "color:blue;"); // "my" message
-					} else {
-					 	item.setAttribute("style", "color:red;"); // others messages
-					}
-					item.innerText = message.name 
-						? json[i].name + ': ' + json[i].text
-						: json[i].text;
-					// append message to the list
-					appendLog(item);
+	<title>Welcome to reddit chat</title>
+	<script type="text/javascript">
+		window.onload = function() {
+			var conn;
+			var msg = document.getElementById("msg");
+			var nick = document.getElementById("nick");
+			var log = document.getElementById("log");
+			var select = document.getElementById("room");
+			var currentRoom = 'AskReddit';
+			var serverAddress = "http://192.168.1.43:9000/";
+
+			function loadHistory(room) {
+				// clear the room messages first
+				while (log.hasChildNodes()) {
+					log.removeChild(log.lastChild);
 				}
-			});
-		}).catch(function(err) {
-			console.log(err);
-		});
-	}
-	function appendLog(item) {
-		var doScroll = log.scrollTop > log.scrollHeight - log.clientHeight - 1;
-		// log.appendChild(item);
-		let firstChild = log.firstChild;
-		log.insertBefore(item, firstChild);
-		if (doScroll) {
-			log.scrollTop = log.scrollHeight - log.clientHeight;
-		}
-	}
-	loadHistory(currentRoom);
-	connectWs(currentRoom);
-	document.getElementById("form").onsubmit = function () {
-		if (!conn) {
-			console.log('no Connection');
-			return false;
-		}
-		if (!msg.value) {
-			console.log('no Value');
-			return false;
-		}
-		var json = {
-			_id: '',
-			text: msg.value, 
-			name: nick.value || 'Anonymous',
-			room_name: select.value || currentRoom,
-			chatRoomId: '',
-			level: 1
-		};
-		conn.send(JSON.stringify(json));
-		msg.value = "";
-		return false;
-	};
-	// make a new websocket connection when switching rooms
-	function connectWs(room) {
-		if (window["WebSocket"]) {
-			conn = new WebSocket("ws://" +
-				document.location.host + "/room/" + room);
-			conn.onopen = function(evt) {
-				var item = document.createElement("div");
-				item.innerHTML = "<em>Connected to " + room + "</em>";
-				log.appendChild(item);
+				fetch(serverAddress + "/history/" + room, {
+					method: 'get'
+				}).then(function(response) {
+					console.log('loaded the history of ' + room + ' room');
+					response.json().then(function(json) {
+						for (var i = 0; i < json.length; i++) {
+							var item = document.createElement("div");
+							var message = json[i];
+							if (message.name === "Moderator") {
+								item.setAttribute("style", "color:purple; font-weight: bolder");
+							} else if (message.name === "Anonymous") {
+								item.setAttribute("style", "color:green;");
+							} else if (message.name === nick.value) {
+								item.setAttribute("style", "color:blue;"); // "my" message
+							} else {
+								item.setAttribute("style", "color:red;"); // others messages
+							}
+							item.innerText = message.name ? json[i].name + ': ' +
+							 json[i].text : json[i].text;
+							// append message to the list
+							appendLog(item);
+						}
+					});
+				}).catch(function(err) {
+					console.log(err);
+				});
 			}
-			conn.onclose = function (evt) {
-				var item = document.createElement("div");
-				item.innerHTML = "<em>Connection to " + room + " closed</em>";
-				log.appendChild(item);
+
+			function appendLog(item) {
+				var doScroll = log.scrollTop > log.scrollHeight - log.clientHeight - 1;
+				// log.appendChild(item);
+				let firstChild = log.firstChild;
+				log.insertBefore(item, firstChild);
+				if (doScroll) {
+					log.scrollTop = log.scrollHeight - log.clientHeight;
+				}
+			}
+			loadHistory(currentRoom);
+			connectWs(currentRoom);
+			document.getElementById("form").onsubmit = function() {
+				if (!conn) {
+					console.log('no Connection');
+					return false;
+				}
+				if (!msg.value) {
+					console.log('no Value');
+					return false;
+				}
+				var json = {
+					_id: '',
+					text: msg.value,
+					name: nick.value || 'Anonymous',
+					room_name: select.value || currentRoom,
+					chatRoomId: '',
+					level: 1
+				};
+				conn.send(JSON.stringify(json));
+				msg.value = "";
+				return false;
 			};
-			conn.onmessage = function (evt) {
-				var message = JSON.parse(evt.data);
-				console.log("Got message: " + message.text);
-				if(message.room_name === select.value) {
-					var item = document.createElement("div");
-					if (message.name === "Moderator") {
-						item.setAttribute("style", "color:purple; font-weight: bolder");
-					} else if  (message.name === "Anonymous") {
-						item.setAttribute("style", "color:green;"); 
-					} else if  (message.name === nick.value) {
-						item.setAttribute("style", "color:blue;"); // "my" message
-					} else {
-					 	item.setAttribute("style", "color:red;"); // others messages
+			// make a new websocket connection when switching rooms
+			function connectWs(room) {
+				if (window["WebSocket"]) {
+					conn = new WebSocket("ws://" +
+						document.location.host + "/room/" + room);
+					conn.onopen = function(evt) {
+						var item = document.createElement("div");
+						item.innerHTML = "<em>Connected to " + room + "</em>";
+						log.appendChild(item);
 					}
-					item.innerText = message.name + ': ' + message.text;
+					conn.onclose = function(evt) {
+						var item = document.createElement("div");
+						item.innerHTML = "<em>Connection to " + room + " closed</em>";
+						log.appendChild(item);
+					};
+					conn.onmessage = function(evt) {
+						var message = JSON.parse(evt.data);
+						console.log("Got message: " + message.text);
+						if (message.room_name === select.value) {
+							var item = document.createElement("div");
+							if (message.name === "Moderator") {
+								item.setAttribute("style", "color:purple; font-weight: bolder");
+							} else if (message.name === "Anonymous") {
+								item.setAttribute("style", "color:green;");
+							} else if (message.name === nick.value) {
+								item.setAttribute("style", "color:blue;"); // "my" message
+							} else {
+								item.setAttribute("style", "color:red;"); // others messages
+							}
+							item.innerText = message.name + ': ' + message.text;
+							log.appendChild(item);
+						}
+					};
+				} else {
+					var item = document.createElement("div");
+					item.innerHTML = "<b>Your browser does not support WebSockets.</b>";
 					log.appendChild(item);
 				}
-			};
-		} else {
-			var item = document.createElement("div");
-			item.innerHTML = "<b>Your browser does not support WebSockets.</b>";
-			log.appendChild(item);
-		}
-	}
-	
-	select.addEventListener("change", function(e) {
-		e.preventDefault();
-		conn.close();
-		connectWs(select.value);
-		loadHistory(select.value);
-	}, false);
-};
-</script>
-<style type="text/css">
-	/*html {
+			}
+
+			select.addEventListener("change", function(e) {
+				e.preventDefault();
+				conn.close();
+				connectWs(select.value);
+				loadHistory(select.value);
+			}, false);
+		};
+	</script>
+	<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+	<style type="text/css">
+		/*html {
 		overflow: hidden;
 	}
 	body {
@@ -151,63 +154,69 @@ window.onload = function () {
 		left: 0px;
 		width: 100%;
 		overflow: hidden;
-	}*/
-
-	html {
-		overflow: hidden;
 	}
-	body {
-		overflow: hidden;
-		padding: 0;
-		margin: 0;
-		width: 100%;
-		height: 100%;
-		background: gray;
+	*/
+	/*
+		html {
+			overflow: hidden;
+		}
+		body {
+			overflow: hidden;
+			padding: 0;
+			margin: 0;
+			width: 100%;
+			height: 100%;
+			background: gray;
+		}
+	*/
+		#log {
+	    background: white;
+	    margin: 0;
+	    padding: 0.5em 0.5em 0.5em 0.5em;
+	    position: absolute;
+	    top: 0.5em;
+	    left: 0.5em;
+	    right: 0.5em;
+	    bottom: 3em;
+	    overflow: auto;
+	    border: solid 1em #ff5200;
 	}
-	#log {
-		background: white;
-		margin: 0;
-		padding: 0.5em 0.5em 0.5em 0.5em;
-		position: absolute;
-		top: 0.5em;
-		left: 0.5em;
-		right: 0.5em;
-		bottom: 3em;
-		overflow: auto;
-	}
-	#form {
-		padding: 0 0.5em 0 0.5em;
-		margin: 0;
-		position: absolute;
-		bottom: 1em;
-		left: 0px;
-		width: 100%;
-		overflow: hidden;
-	}
-	.congrats{    
-		position: absolute;
-	  top: 0;
-	  z-index: 100;
-	  background: red;
-	  color: white;
-	  font-size: 20px;
-	  font-family: fantasy;
-	}
-</style>
+	/*
+		#form {
+			padding: 0 0.5em 0 0.5em;
+			margin: 0;
+			position: absolute;
+			bottom: 1em;
+			left: 0px;
+			width: 100%;
+			overflow: hidden;
+		}
+	*/
+		.congrats {
+			position: absolute;
+			top: 0;
+			z-index: 100;
+			background: red;
+			color: white;
+			font-size: 20px;
+			font-family: fantasy;
+		}
+	</style>
 </head>
+
 <body>
-<p class="con"> Thank you for authenticating with reddit </p>
-<div id="log"></div>
-<form id="form">
-	<input type="submit" value="Send" />
-	<input type="text" id="msg" size="64"/>
-	Nick: <input type="text" id="nick" size="30" value="{{.Username}}"/>
-	Chatroom:
-	<select id="room">
-		{{range $i, $a := .Chatrooms}}
-		  <option value="{{ .Name }}">{{ .Name }}</option>
-	  {{end}}
-	</select>
-</form>
+	<p class="con"> Thank you for authenticating with reddit </p>
+	<div id="log"></div>
+	<form id="form">
+		<input type="submit" value="Send" />
+		<input type="text" id="msg" size="64" /> Nick:
+		<input type="text" id="nick" size="30" value="{{.Username}}" /> Chatroom:
+		<select id="room">
+			{{range $i, $a := .Chatrooms}}
+			<option value="{{ .Name }}">{{ .Name }}</option>
+			{{end}}
+		</select>
+	</form>
 </body>
+
 </html>

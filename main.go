@@ -112,20 +112,20 @@ func serveChat(w http.ResponseWriter, r *http.Request) {
 	if err != nil { // i.e. cookie not found
 		log.Println(err)
 		template.Must(
-			template.New("chat.html").ParseFiles(
-				project_root+"/chat.html")).Execute(w, struct {
+			template.New("chatv2.html").ParseFiles(
+				project_root+"/chatv2.html")).Execute(w, struct {
 			Username  string
 			Chatrooms []Chatroom
 		}{"Error getting your cookie", Rooms})
 	} else {
 		log.Println("Found cookie value " + cookie.Value)
-		user := users[cookie.Value]
+		// user := users[cookie.Value]
 		template.Must(
-			template.New("chat.html").ParseFiles(
-				project_root+"/chat.html")).Execute(w, struct {
+			template.New("chatv2.html").ParseFiles(
+				project_root+"/chatv2.html")).Execute(w, struct {
 			Username  string
 			Chatrooms []Chatroom
-		}{user.Name, Rooms})
+		}{cookie.Value, Rooms}) // remember to change to name.value!
 	}
 
 }
@@ -276,7 +276,7 @@ func getRedditAuth(code string) RedditAuth {
 		"Web 1x83QLDFHequ8w 1.9.3 (by /u/SEND_ME_RARE_PEPES)")
 	encoded := base64.StdEncoding.EncodeToString(
 		[]byte(CLIENT_ID + ":" + CLIENT_SECRET))
-	req.Header.Add("Authorization", "Basic "+encoded)
+	req.Header.Add("Authorization", "Basic "+encxoded)
 	res, err := client.Do(req)
 	defer res.Body.Close()
 	if err != nil {
@@ -362,7 +362,7 @@ func serveChannelHistory(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	// gets the subreddits and stores them in the DB
-	getPopularSubreddits()
+	go getPopularSubreddits()
 	// initialize the user slice
 	users = make(map[string]User)
 	flag.Parse()
