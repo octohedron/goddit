@@ -24,7 +24,7 @@
 					response.json().then(function(json) {
 						if(json) {
 							for (var i = 0; i < json.length; i++) {
-								var item = document.createElement("div");
+								var item = document.createElement("li");
 								var message = json[i];
 								if (message.name === "Moderator") {
 									message.color = "512DA8";
@@ -35,9 +35,9 @@
 								} else {
 									message.color = "FF3D00";
 								}
+								item.setAttribute("class", "media");
 								// template
 								const Item = ({ name, text, color }) => `
-									<li class="media">
 										<div class="media-body">
 											<div class="media">
 												<a class="pull-left" href="#">
@@ -50,8 +50,7 @@
 													<hr>
 												</div>
 											</div>
-										</div>
-									</li>`;
+										</div>`;
 								$(item).html([json[i]].map(Item).join(''));
 								appendLog(item);
 							}
@@ -63,12 +62,16 @@
 			}
 
 			function appendLog(item) {
-				var doScroll = log.scrollTop > log.scrollHeight - log.clientHeight - 1;
+				// var doScroll = log.scrollTop > log.scrollHeight - log.clientHeight - 1;
 				let firstChild = log.firstChild;
 				log.insertBefore(item, firstChild);
-				if (doScroll) {
-					log.scrollTop = log.scrollHeight - log.clientHeight;
-				}
+				// let yCoords = $(item).offset().top;
+				
+				// $(log).scrollTop($(log).find("li").last().position().top);
+				Array.from(document.querySelectorAll("#log li")).pop().scrollIntoView(true);
+				// if (doScroll) {
+				// 	log.scrollTop = log.scrollHeight - log.clientHeight;
+				// }
 			}
 			loadHistory(currentRoom);
 			connectWs(currentRoom);
@@ -85,7 +88,7 @@
 				var json = {
 					_id: '',
 					text: msg.value,
-					name: {{ .Username }},
+					name: "{{ .Username }}",
 					room_name: currentRoom,
 					chatRoomId: '',
 					level: 1
@@ -100,19 +103,19 @@
 					conn = new WebSocket("ws://" +
 						document.location.host + "/room/" + room);
 					conn.onopen = function(evt) {
-						var item = document.createElement("div");
+						var item = document.createElement("li");
 						item.innerHTML = "<em>Connected to " + room + "</em>";
 						log.appendChild(item);
 					}
 					conn.onclose = function(evt) {
-						var item = document.createElement("div");
+						var item = document.createElement("li");
 						item.innerHTML = "<em>Connection to " + room + " closed</em>";
 						log.appendChild(item);
 					};
 					conn.onmessage = function(evt) {
 						var message = JSON.parse(evt.data);
 						console.log("Got message: " + message.text);
-						var item = document.createElement("div");
+						var item = document.createElement("li");
 						if (message.name === "Moderator") {
 							message.color = "512DA8";
 						} else if (message.name === "Anonymous") {
@@ -122,9 +125,9 @@
 						} else {
 							message.color = "FF3D00";
 						}
+						item.setAttribute("class", "media");
 						// template
 						const Item = ({ name, text, color }) => `
-							<li class="media">
 								<div class="media-body">
 									<div class="media">
 										<a class="pull-left" href="#">
@@ -137,13 +140,13 @@
 											<hr>
 										</div>
 									</div>
-								</div>
-							</li>`;
+								</div>`;
 						$(item).html([message].map(Item).join(''));
 						log.appendChild(item);
+						item.scrollIntoView(true);
 					};
 				} else {
-					var item = document.createElement("div");
+					var item = document.createElement("li");
 					item.innerHTML = "<b>Your browser does not support WebSockets.</b>";
 					log.appendChild(item);
 				}
@@ -170,10 +173,11 @@
 					console.log('no Value');
 					return false;
 				}
+				let name = '{{ .Username }}';
 				var json = {
 					_id: '',
 					text: msg.value,
-					name: {{ .Username }},
+					name,
 					room_name: currentRoom,
 					chatRoomId: '',
 					level: 1
