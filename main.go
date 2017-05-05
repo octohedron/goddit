@@ -76,14 +76,9 @@ type RedditAuth struct {
 	Scope        string `json:"scope"`
 }
 
-// type RedditSubreddit struct {
-// 	Id           bson.ObjectId `bson:"_id,omitempty" json:"_id,omitempty" inline`
-// 	Display_name string        `bson:"display_name,omitempty" json:"display_name,omitempty" inline`
-// }
-
 var addr = flag.String("addr", ":9000", "http service address")
 
-const project_root = "/home/vagrant/GO/chat"
+const project_root = "/home/vagrant/go/src/github.com/octohedron/chat"
 
 func serveChat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
@@ -276,7 +271,7 @@ func getRedditAuth(code string) RedditAuth {
 		"Web 1x83QLDFHequ8w 1.9.3 (by /u/SEND_ME_RARE_PEPES)")
 	encoded := base64.StdEncoding.EncodeToString(
 		[]byte(CLIENT_ID + ":" + CLIENT_SECRET))
-	req.Header.Add("Authorization", "Basic "+encxoded)
+	req.Header.Add("Authorization", "Basic "+encoded)
 	res, err := client.Do(req)
 	defer res.Body.Close()
 	if err != nil {
