@@ -76,9 +76,10 @@ type RedditAuth struct {
 	Scope        string `json:"scope"`
 }
 
-var addr = flag.String("addr", ":9000", "http service address")
-
 const project_root = "/home/vagrant/go/src/github.com/octohedron/chat"
+
+var addr = flag.String("addr", ":9000", "http service address")
+var src = rand.NewSource(time.Now().UnixNano())
 
 func serveChat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
@@ -99,19 +100,16 @@ func serveChat(w http.ResponseWriter, r *http.Request) {
 	err = c.Find(nil).All(&Rooms)
 	if err != nil {
 		log.Println(err)
-		panic(err)
+		panic(err) // didn't find any rooms, something wrong with the DB
 	} else {
 		log.Printf("Found chatrooms: %d \n", len(Rooms))
 	}
-	cookie, err := r.Cookie("chatterbot")
+	cookie, err := r.Cookie("redditChat")
 	if err != nil { // i.e. cookie not found
 		log.Println(err)
-		template.Must(
-			template.New("chat.html").ParseFiles(
-				project_root+"/chat.html")).Execute(w, struct {
-			Username  string
-			Chatrooms []Chatroom
-		}{"Error getting your cookie", Rooms})
+		// respond with forbidden
+		template.Must(template.New("403.html").ParseFiles(
+			project_root+"/403.html")).Execute(w, "")
 	} else {
 		log.Println("Found cookie value " + cookie.Value)
 		// user := users[cookie.Value]
@@ -130,7 +128,7 @@ func serveIndex(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", 405)
 		return
 	}
-	cookie, err := r.Cookie("chatterbot")
+	cookie, err := r.Cookie("redditChat")
 	if err != nil { // i.e. cookie not found
 		state := getRandomString(8)
 		url := "https://ssl.reddit.com/api/v1/authorize?" + "client_id=" +
@@ -162,7 +160,7 @@ func serveRedditCallback(w http.ResponseWriter, r *http.Request) {
 	cookie := &http.Cookie{
 		Expires: expire,
 		MaxAge:  86400,
-		Name:    "chatterbot",
+		Name:    "redditChat",
 		Value:   user.Name,
 		Path:    "/chat",
 		Domain:  "192.168.1.43",
@@ -384,8 +382,6 @@ func main() {
 		log.Fatal("ListenAndServe: ", err)
 	}
 }
-
-var src = rand.NewSource(time.Now().UnixNano())
 
 func getRandomString(n int) string {
 	b := make([]byte, n)

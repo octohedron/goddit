@@ -49,10 +49,7 @@
 					message.color = "512DA8";
 				} else if (message.name === "Anonymous") {
 					message.color = "388E3C";
-				} else if (message.name === {
-						{.Username
-						}
-					}) {
+				} else if (message.name === '{{.Username}}') {
 					message.color = "1565C0";
 				} else {
 					message.color = "FF3D00";
@@ -98,7 +95,7 @@
 				var json = {
 					_id: '',
 					text: msg.value,
-					name: "{{ .Username }}",
+					name: '{{ .Username }}',
 					room_name: currentRoom,
 					chatRoomId: '',
 					level: 1
@@ -169,9 +166,6 @@
 				}
 			});
 		}
-	</script>
-	<script id="hidden-template" type="text/x-custom-template">
-
 	</script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js" crossorigin="anonymous"></script>
 	<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
@@ -247,23 +241,11 @@
 				<div class="row chat-toolbar-row">
 					<div class="col-sm-12">
 						<div class="btn-group chat-toolbar" role="group" aria-label="...">
-							<button id="chat-leave" class="btn btn-default ticket-option" type="button">
+							<a href="/" id="chat-leave" class="btn btn-default ticket-option" type="button">
 								<i class="glyphicon glyphicon-remove-sign"></i> Leave Chat
-							</button>
+							</a>
 							<button id="chat-invite" class="btn btn-default ticket-option" type="button">
 								<i class="glyphicon glyphicon-plus"></i> Invite
-							</button>
-							<button id="chat-customer" class="btn btn-default ticket-option" type="button">
-								<i class="glyphicon glyphicon-user"></i> Open Customer
-							</button>
-							<button id="chat-create-ticket" class="btn btn-default ticket-option" type="button">
-								<i class="glyphicon glyphicon-pencil"></i> Create Ticket
-							</button>
-							<button id="chat-add-ticket" class="btn btn-default ticket-option" type="button">
-								<i class="glyphicon glyphicon-plus"></i> Add to Ticket
-							</button>
-							<button id="chat-open-ticket" class="btn btn-default ticket-option" type="button">
-								<i class="glyphicon glyphicon-open"></i> Open Ticket
 							</button>
 						</div>
 					</div>
