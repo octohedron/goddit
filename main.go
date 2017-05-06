@@ -174,7 +174,7 @@ func redditCallback(w http.ResponseWriter, r *http.Request) {
 		MaxAge:  86400,
 		Name:    "goddit",
 		Value:   user.Name,
-		Path:    "/",
+		Path:    "/chat",
 		Domain:  "goddit.pro",
 	}
 	http.SetCookie(w, cookie)
