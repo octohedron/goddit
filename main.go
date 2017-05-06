@@ -22,7 +22,7 @@ import (
 const (
 	CLIENT_ID      = "yZyS6F3xixfoBg"
 	CLIENT_SECRET  = "hZMDJJ_QsQtn21SGPbzHDsKE6S8"
-	SERVER_ADDRESS = "goddit.pro"
+	SERVER_ADDRESS = "http://goddit.pro"
 	SERVER_IP      = "52.58.76.202"
 	REDIRECT_URI   = SERVER_ADDRESS + "/reddit_callback"
 	letterBytes    = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
