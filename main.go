@@ -132,7 +132,6 @@ func serveChat(w http.ResponseWriter, r *http.Request) {
 			Chatrooms []Chatroom
 		}{cookie.Value, Rooms}) // remember to change to name.value!
 	}
-
 }
 
 func serveIndex(w http.ResponseWriter, r *http.Request) {
@@ -141,7 +140,7 @@ func serveIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cookie, err := r.Cookie("goddit")
-	if err != nil { // i.e. cookie not found
+	if err != nil || users[cookie.Value].Name == "" {
 		state := getRandomString(8)
 		url := "https://ssl.reddit.com/api/v1/authorize?" + "client_id=" +
 			CLIENT_ID + "&response_type=code&state=" + state + "&redirect_uri=" +
@@ -174,7 +173,7 @@ func serveRedditCallback(w http.ResponseWriter, r *http.Request) {
 		MaxAge:  86400,
 		Name:    "goddit",
 		Value:   user.Name,
-		Path:    "/chat",
+		Path:    "/",
 		Domain:  "192.168.1.43",
 	}
 	log.Println("Setting cookie " + user.Name)
@@ -347,9 +346,10 @@ func serveChannelHistory(w http.ResponseWriter, r *http.Request) {
 	}
 	// initialize a slice of size messageAmount to store the messages
 	var messageSlice []Message
-	// find all the messages in this chatroom
+	// find the last 150 messages in the room
 	err = m.Find(
-		bson.M{"chatRoomId": room.Id}).Sort("-timestamp").All(&messageSlice)
+		bson.M{"chatRoomId": room.Id}).Sort(
+		"-timestamp").Limit(150).All(&messageSlice)
 	log.Printf("Messages in the channel: %d \n", len(messageSlice))
 	// get json
 	js, err := json.Marshal(messageSlice)

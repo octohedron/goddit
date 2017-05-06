@@ -82,6 +82,12 @@
 			}
 			loadHistory(currentRoom);
 			connectWs(currentRoom);
+			document.getElementById("chat-leave").addEventListener("click", function(e) {
+				e.preventDefault();
+				document.cookie = 'goddit=; value=; path=' + '192.168.1.43:9000/chat' +
+					';expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+				document.location = serverAddress;
+			});
 			document.getElementById("submit").addEventListener("click", function(e) {
 				e.preventDefault();
 				if (!conn) {
@@ -92,19 +98,22 @@
 					console.log('no Value');
 					return false;
 				}
+				sendMessage();
+				return false;
+			}, false);
+			// make a new websocket connection when switching rooms
+			function sendMessage() {
 				var json = {
 					_id: '',
 					text: msg.value,
-					name: '{{ .Username }}',
+					name: "{{ .Username }}",
 					room_name: currentRoom,
 					chatRoomId: '',
 					level: 1
 				};
 				conn.send(JSON.stringify(json));
 				msg.value = "";
-				return false;
-			}, false);
-			// make a new websocket connection when switching rooms
+			}
 			function connectWs(room) {
 				if (window["WebSocket"]) {
 					conn = new WebSocket("ws://" +
@@ -121,7 +130,7 @@
 					};
 					conn.onmessage = function(evt) {
 						var message = JSON.parse(evt.data);
-						console.log("Got message: " + message.text);
+						// console.log(message);
 						printMessage(message, false);
 					};
 				} else {
@@ -151,17 +160,7 @@
 						console.log('no Value');
 						return false;
 					}
-					let name = '{{ .Username }}';
-					var json = {
-						_id: '',
-						text: msg.value,
-						name,
-						room_name: currentRoom,
-						chatRoomId: '',
-						level: 1
-					};
-					conn.send(JSON.stringify(json));
-					msg.value = "";
+					sendMessage();
 					return false;
 				}
 			});
@@ -245,7 +244,7 @@
 				<div class="row chat-toolbar-row">
 					<div class="col-sm-12">
 						<div class="btn-group chat-toolbar" role="group" aria-label="...">
-							<a href="/" id="chat-leave" class="btn btn-default ticket-option" type="button">
+							<a href="#" id="chat-leave" class="btn btn-default ticket-option" type="button">
 								<i class="glyphicon glyphicon-remove-sign"></i> Leave Chat
 							</a>
 							<a class="twitter-share-button" href="https://twitter.com/intent/tweet?text=Check out the new Goddit reddit chat!&url=http://google.com"
