@@ -79,7 +79,7 @@ type RedditAuth struct {
 
 const project_root = "/home/ubuntu/go/src/github.com/octohedron/goddit"
 
-var addr = flag.String("addr", ":80", "http service address")
+// var addr = flag.String("addr", ":80", "http service address")
 var src = rand.NewSource(time.Now().UnixNano())
 var users map[string]User
 var AuthorizedIps []string
@@ -380,7 +380,7 @@ func main() {
 		})
 	srv := &http.Server{
 		Handler: r,
-		Addr:    *addr,
+		Addr:    ":80",
 		// Enforcing timeouts
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
