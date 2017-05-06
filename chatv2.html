@@ -26,33 +26,7 @@
 							for (var i = 0; i < json.length; i++) {
 								var item = document.createElement("li");
 								var message = json[i];
-								if (message.name === "Moderator") {
-									message.color = "512DA8";
-								} else if (message.name === "Anonymous") {
-									message.color = "388E3C";
-								} else if (message.name === {{.Username}}) {
-									message.color = "1565C0";
-								} else {
-									message.color = "FF3D00";
-								}
-								item.setAttribute("class", "media");
-								// template
-								const Item = ({ name, text, color }) => `
-										<div class="media-body">
-											<div class="media">
-												<a class="pull-left" href="#">
-													<img class="media-object img-circle " src="http://placeskull.com/50/50/${color}">
-												</a>
-												<div class="media-body">
-													${text}
-													<br>
-													<small class="text-muted">${name} | 23rd June at 5:00pm</small>
-													<hr>
-												</div>
-											</div>
-										</div>`;
-								$(item).html([json[i]].map(Item).join(''));
-								appendLog(item);
+								printMessage(message, true);
 							}
 						}
 					});
@@ -62,16 +36,45 @@
 			}
 
 			function appendLog(item) {
-				// var doScroll = log.scrollTop > log.scrollHeight - log.clientHeight - 1;
 				let firstChild = log.firstChild;
 				log.insertBefore(item, firstChild);
-				// let yCoords = $(item).offset().top;
-				
-				// $(log).scrollTop($(log).find("li").last().position().top);
+				// scroll to last item
 				Array.from(document.querySelectorAll("#log li")).pop().scrollIntoView(true);
-				// if (doScroll) {
-				// 	log.scrollTop = log.scrollHeight - log.clientHeight;
-				// }
+			}
+			function printMessage(message, isHistory){
+				var item = document.createElement("li");
+				if (message.name === "Moderator") {
+					message.color = "512DA8";
+				} else if (message.name === "Anonymous") {
+					message.color = "388E3C";
+				} else if (message.name === {{.Username}}) {
+					message.color = "1565C0";
+				} else {
+					message.color = "FF3D00";
+				}
+				item.setAttribute("class", "media");
+				// template
+				const Item = ({ name, text, color }) => `
+						<div class="media-body">
+							<div class="media">
+								<a class="pull-left" href="#">
+									<img class="media-object img-circle " src="http://placeskull.com/50/50/${color}">
+								</a>
+								<div class="media-body">
+									${text}
+									<br>
+									<small class="text-muted">${name} | 23rd June at 5:00pm</small>
+									<hr>
+								</div>
+							</div>
+						</div>`;
+				$(item).html([message].map(Item).join(''));
+				if(isHistory) {
+					appendLog(item);
+				} else {
+					log.appendChild(item);
+					item.scrollIntoView(true);
+				}
 			}
 			loadHistory(currentRoom);
 			connectWs(currentRoom);
@@ -115,35 +118,7 @@
 					conn.onmessage = function(evt) {
 						var message = JSON.parse(evt.data);
 						console.log("Got message: " + message.text);
-						var item = document.createElement("li");
-						if (message.name === "Moderator") {
-							message.color = "512DA8";
-						} else if (message.name === "Anonymous") {
-							message.color = "388E3C";
-						} else if (message.name === {{.Username}}) {
-							message.color = "1565C0";
-						} else {
-							message.color = "FF3D00";
-						}
-						item.setAttribute("class", "media");
-						// template
-						const Item = ({ name, text, color }) => `
-								<div class="media-body">
-									<div class="media">
-										<a class="pull-left" href="#">
-											<img class="media-object img-circle " src="http://placeskull.com/50/50/${color}">
-										</a>
-										<div class="media-body">
-											${text}
-											<br>
-											<small class="text-muted">${name} | 23rd June at 5:00pm</small>
-											<hr>
-										</div>
-									</div>
-								</div>`;
-						$(item).html([message].map(Item).join(''));
-						log.appendChild(item);
-						item.scrollIntoView(true);
+						printMessage(message, false);
 					};
 				} else {
 					var item = document.createElement("li");
@@ -151,7 +126,6 @@
 					log.appendChild(item);
 				}
 			}
-
 		document.getElementById("rooms").addEventListener("click", function(e) {
 			if(e.target && e.target.nodeName == "A") {
 				e.preventDefault();
@@ -234,6 +208,7 @@
 		.current-chat-footer {
 		    position: absolute;
 		    bottom: 0;
+		    width: 100%;
 		    
 		}
 		#rooms{
@@ -247,7 +222,7 @@
 <body>
 	<div class="container-fluid">
 		<div class="row">
-			<div class="col-md-3">
+			<div class="col-md-2 col-lg-2 col-sm-6">
 				<div class="row chats-row">
 					<div class="media-list" id="rooms">
 					{{range $i, $a := .Chatrooms}}
@@ -258,7 +233,7 @@
 					</div>
 				</div>
 			</div>
-			<div class="col-md-9 current-chat">
+			<div class="col-md-10 col-lg-10 col-sm-6 current-chat">
 				<div class="row chat-toolbar-row">
 					<div class="col-sm-12">
 						<div class="btn-group chat-toolbar" role="group" aria-label="...">
