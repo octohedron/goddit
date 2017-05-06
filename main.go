@@ -22,6 +22,7 @@ const (
 	CLIENT_ID      = "5ao8tf2OzcUFJg"
 	CLIENT_SECRET  = "yeRLdTb3oN6giRbbMs7Tmvm5sYk"
 	SERVER_ADDRESS = "http://192.168.1.43:9000"
+	SERVER_IP      = "192.168.1.43"
 	REDIRECT_URI   = SERVER_ADDRESS + "/reddit_callback"
 	letterBytes    = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	letterIdxBits  = 6                    // 6 bits to represent a letter index
@@ -91,7 +92,7 @@ var src = rand.NewSource(time.Now().UnixNano())
  * since the map in the server is set by the response from reddit we are sure
  * they authenticated.
  */
-func serveChat(w http.ResponseWriter, r *http.Request) {
+func chat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", 405)
 		return
@@ -134,7 +135,7 @@ func serveChat(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func serveIndex(w http.ResponseWriter, r *http.Request) {
+func index(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", 405)
 		return
@@ -156,7 +157,7 @@ func serveIndex(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func serveRedditCallback(w http.ResponseWriter, r *http.Request) {
+func redditCallback(w http.ResponseWriter, r *http.Request) {
 	err := r.FormValue("error")
 	if err != "" {
 		log.Println(err)
@@ -174,13 +175,8 @@ func serveRedditCallback(w http.ResponseWriter, r *http.Request) {
 		Name:    "goddit",
 		Value:   user.Name,
 		Path:    "/",
-		Domain:  "192.168.1.43",
+		Domain:  SERVER_IP,
 	}
-	log.Println("Setting cookie " + user.Name)
-	// header := &http.Header{
-	// 	"Access-Control-Allow-Credential": "true"
-	// }
-	// http.Header.Set(w.Header(), "Access-Control-Allow-Credential", "true")
 	http.SetCookie(w, cookie)
 	log.Println("Redirecting to /chat")
 	http.Redirect(w, r, SERVER_ADDRESS+"/chat", 302)
@@ -297,8 +293,13 @@ func getRedditAuth(code string) RedditAuth {
 /**
  * Load the previous messages from this channel from the database
  */
-func serveChannelHistory(w http.ResponseWriter, r *http.Request) {
+func channelHistory(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
+	name := r.Header.Get("name")
+	if name == "" || users[name].Name == "" {
+		http.Error(w, "Forbidden", 403)
+		return
+	}
 	// connect to the database
 	session, err := mgo.Dial("127.0.0.1")
 	if err != nil {
@@ -374,10 +375,10 @@ func main() {
 	r := mux.NewRouter()
 	hub := newHub()
 	go hub.run()
-	r.HandleFunc("/", serveIndex)
-	r.HandleFunc("/chat", serveChat)
-	r.HandleFunc("/reddit_callback", serveRedditCallback)
-	r.HandleFunc("/history/{channel}", serveChannelHistory)
+	r.HandleFunc("/", index)
+	r.HandleFunc("/chat", chat)
+	r.HandleFunc("/reddit_callback", redditCallback)
+	r.HandleFunc("/history/{channel}", channelHistory)
 	r.HandleFunc("/room/{channel}",
 		func(w http.ResponseWriter, r *http.Request) {
 			serveWs(hub, w, r)

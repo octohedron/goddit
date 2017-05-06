@@ -12,13 +12,18 @@
 			var select = document.getElementById("room");
 			var currentRoom = 'AskReddit';
 			var serverAddress = "http://192.168.1.43:9000/";
-
+			
 			function loadHistory(room) {
+				var authHeader = new Headers();
+				authHeader.append("name", "{{ .Username }}");
+				var request = { method: 'GET', headers: authHeader, cache: 'default' };
+				var historyRequest = 
+					new Request(serverAddress + "/history/" + room, request);
 				// clear the room messages first
 				while (log.hasChildNodes()) {
 					log.removeChild(log.lastChild);
 				}
-				fetch(serverAddress + "/history/" + room, {
+				fetch(historyRequest, {
 					method: 'get'
 				}).then(function(response) {
 					console.log('loaded the history of ' + room + ' room');
