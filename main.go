@@ -81,6 +81,16 @@ const project_root = "/home/vagrant/go/src/github.com/octohedron/chat"
 var addr = flag.String("addr", ":9000", "http service address")
 var src = rand.NewSource(time.Now().UnixNano())
 
+/**
+ * Serve the /chat route
+ *
+ * Checks the cookie in the request, if the cookie is not found or the value
+ * is not found in the server memory map, then return 403.
+ *
+ * This measure is enforeced to prevent people not authenticated correctly
+ * since the map in the server is set by the response from reddit we are sure
+ * they authenticated.
+ */
 func serveChat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", 405)
@@ -104,15 +114,17 @@ func serveChat(w http.ResponseWriter, r *http.Request) {
 	} else {
 		log.Printf("Found chatrooms: %d \n", len(Rooms))
 	}
-	cookie, err := r.Cookie("redditChat")
-	if err != nil { // i.e. cookie not found
+	cookie, err := r.Cookie("goddit")
+	/**
+	 * Cookie not found or user not logged in
+	 */
+	if err != nil || users[cookie.Value].Name == "" {
 		log.Println(err)
 		// respond with forbidden
 		template.Must(template.New("403.html").ParseFiles(
 			project_root+"/403.html")).Execute(w, "")
 	} else {
-		log.Println("Found cookie value " + cookie.Value)
-		// user := users[cookie.Value]
+		log.Printf("User map in memory \n %+v", users[cookie.Value])
 		template.Must(
 			template.New("chat.html").ParseFiles(
 				project_root+"/chat.html")).Execute(w, struct {
@@ -128,7 +140,7 @@ func serveIndex(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", 405)
 		return
 	}
-	cookie, err := r.Cookie("redditChat")
+	cookie, err := r.Cookie("goddit")
 	if err != nil { // i.e. cookie not found
 		state := getRandomString(8)
 		url := "https://ssl.reddit.com/api/v1/authorize?" + "client_id=" +
@@ -160,7 +172,7 @@ func serveRedditCallback(w http.ResponseWriter, r *http.Request) {
 	cookie := &http.Cookie{
 		Expires: expire,
 		MaxAge:  86400,
-		Name:    "redditChat",
+		Name:    "goddit",
 		Value:   user.Name,
 		Path:    "/chat",
 		Domain:  "192.168.1.43",
