@@ -107,8 +107,8 @@ func serveChat(w http.ResponseWriter, r *http.Request) {
 	if err != nil { // i.e. cookie not found
 		log.Println(err)
 		template.Must(
-			template.New("chatv2.html").ParseFiles(
-				project_root+"/chatv2.html")).Execute(w, struct {
+			template.New("chat.html").ParseFiles(
+				project_root+"/chat.html")).Execute(w, struct {
 			Username  string
 			Chatrooms []Chatroom
 		}{"Error getting your cookie", Rooms})
@@ -116,8 +116,8 @@ func serveChat(w http.ResponseWriter, r *http.Request) {
 		log.Println("Found cookie value " + cookie.Value)
 		// user := users[cookie.Value]
 		template.Must(
-			template.New("chatv2.html").ParseFiles(
-				project_root+"/chatv2.html")).Execute(w, struct {
+			template.New("chat.html").ParseFiles(
+				project_root+"/chat.html")).Execute(w, struct {
 			Username  string
 			Chatrooms []Chatroom
 		}{cookie.Value, Rooms}) // remember to change to name.value!
