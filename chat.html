@@ -72,7 +72,7 @@
 								<div class="media-body">
 									${text}
 									<br>
-									<small class="text-muted">${name} | 23rd June at 5:00pm</small>
+									<small class="text-muted">${name}</small>
 									<hr>
 								</div>
 							</div>
@@ -169,6 +169,16 @@
 					return false;
 				}
 			});
+			$(".media-list a").on("click", function() {
+				$(".media-list a").removeClass("active");
+				$(this).addClass("active");
+			});
+			$(".media-list a").on("click", function() {
+				$(".media-list a").removeClass("active");
+				$(this).addClass("active");
+			});
+			// add active to first chat channel when loading the page
+			$(".media-list a").first().addClass("active");
 		}
 	</script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js" crossorigin="anonymous"></script>
@@ -237,11 +247,11 @@
 		<div class="row">
 			<div class="col-md-2 col-lg-2 col-sm-6">
 				<div class="row chats-row">
+					<!-- SUBREDDITS -->
 					<div class="media-list" id="rooms">
 						{{range $i, $a := .Chatrooms}}
-						<a href="#" class="list-group-item">{{ .Name }}</a> {{end}}
-						<a href="#" class="list-group-item list-group-item-success">Current</a>
-						<a href="#" class="list-group-item active">Prev</a>
+							<a href="#" class="list-group-item">{{ .Name }}</a> 
+						{{end}}
 					</div>
 				</div>
 			</div>
@@ -249,10 +259,11 @@
 				<div class="row chat-toolbar-row">
 					<div class="col-sm-12">
 						<div class="btn-group chat-toolbar" role="group" aria-label="...">
-							<a href="#" id="chat-leave" class="btn btn-default ticket-option" type="button">
-								<i class="glyphicon glyphicon-remove-sign"></i> Leave Chat
-							</a>
-							<a class="twitter-share-button" href="https://twitter.com/intent/tweet?text=Check out the new Goddit reddit chat!&url=http://google.com"
+							<a href="#" id="chat-leave" class="btn btn-default ticket-option" 
+								type="button">
+								<i class="glyphicon glyphicon-remove-sign"></i> Leave Chat </a>
+							<a class="twitter-share-button" 
+								href="https://twitter.com/intent/tweet?text=Check out this reddit chat&url=http://google.com"
 							  data-size="large"> Tweet
 							</a>
 						</div>

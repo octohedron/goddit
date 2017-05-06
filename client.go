@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"gopkg.in/mgo.v2"
@@ -111,11 +110,8 @@ func saveMessage(message *Message) {
 	m := session.DB("views").C("messages")
 	var room Chatroom
 	// find the chatroom at this request
-	// feature missing, get the chatroom name or id, hardcoding "devs"
-	// channel for now
 	err = c.Find(bson.M{"name": message.ChatRoomName}).One(&room)
 	if err != nil { // channel not found
-		fmt.Println("Channel not found, creating new channel...")
 		// create new channel
 		room.Name = message.ChatRoomName
 		room.Level = "0"
@@ -125,12 +121,8 @@ func saveMessage(message *Message) {
 		if err != nil {
 			log.Println(err)
 		} else {
-			log.Println("No errors creating the room, appending room id")
 			room.Messages = append(room.Messages, message.MessageId)
-			log.Println(room.Messages)
 		}
-	} else { // channel found
-		fmt.Printf("Found channel: %s \n", message.ChatRoomName)
 	}
 	// construct the new message
 	message.ChatRoomId = room.Id
@@ -149,8 +141,6 @@ func saveMessage(message *Message) {
 		panic(err)
 	}
 	if len(messageSlice) > 0 {
-		fmt.Printf("Found %d messages in: %s \n",
-			len(messageSlice), message.ChatRoomName)
 		if err != nil {
 			log.Println(err)
 		}
@@ -158,8 +148,6 @@ func saveMessage(message *Message) {
 		for i := 0; i < len(messageSlice); i++ {
 			bsonMessageSlice = append(bsonMessageSlice, messageSlice[i].MessageId)
 		}
-	} else {
-		fmt.Println("Something wrong, couldn't find messages in the chatroom")
 	}
 	// append the new message
 	bsonMessageSlice = append(bsonMessageSlice, message.MessageId)
@@ -233,7 +221,6 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Not authorized", 403)
 		return
 	}
-	log.Printf("Websocket for room: %s \n", vars["channel"])
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)

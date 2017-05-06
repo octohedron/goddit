@@ -182,7 +182,6 @@ func redditCallback(w http.ResponseWriter, r *http.Request) {
 		Domain:  SERVER_IP,
 	}
 	http.SetCookie(w, cookie)
-	log.Println("Redirecting to /chat")
 	http.Redirect(w, r, SERVER_ADDRESS+"/chat", 302)
 }
 
@@ -263,7 +262,6 @@ func getPopularSubreddits() {
 		}
 		bulkT.Insert(subreddit)
 	}
-	// log.Printf("SUBREDDITS: \n %v \n", subreddits)
 	_, err = bulkT.Run()
 	if err != nil {
 		log.Println("Found duplicate subreddits...")
@@ -290,7 +288,6 @@ func getRedditAuth(code string) RedditAuth {
 	body, err := ioutil.ReadAll(res.Body)
 	// log.Printf("BODY: \n %s", string(body[:]))
 	err = json.Unmarshal(body, &redditAuth)
-	log.Printf("Access token: %s", redditAuth.Access_token)
 	return redditAuth
 }
 
