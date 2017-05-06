@@ -15,6 +15,7 @@ import (
 	"math/rand"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -47,9 +48,8 @@ type User struct {
 	Activation_token string  `bson:"activation_token" json:"activation_token"`
 	Created_at       string  `bson:"created_at" json:"created_at"`
 	Auth             RedditAuth
+	IP               string
 }
-
-var users map[string]User
 
 type Chatroom struct {
 	Id        bson.ObjectId   `bson:"_id,omitempty" json:"_id,omitempty" inline`
@@ -81,16 +81,14 @@ const project_root = "/home/vagrant/go/src/github.com/octohedron/chat"
 
 var addr = flag.String("addr", ":9000", "http service address")
 var src = rand.NewSource(time.Now().UnixNano())
+var users map[string]User
+var AuthorizedIps []string
 
 /**
  * Serve the /chat route
  *
  * Checks the cookie in the request, if the cookie is not found or the value
  * is not found in the server memory map, then return 403.
- *
- * This measure is enforeced to prevent people not authenticated correctly
- * since the map in the server is set by the response from reddit we are sure
- * they authenticated.
  */
 func chat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
@@ -154,7 +152,6 @@ func index(w http.ResponseWriter, r *http.Request) {
 		log.Println("Found cookie " + cookie.Value)
 		http.Redirect(w, r, SERVER_ADDRESS+"/chat", 302)
 	}
-
 }
 
 func redditCallback(w http.ResponseWriter, r *http.Request) {
@@ -164,8 +161,15 @@ func redditCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	authData := getRedditAuth(r.FormValue("code"))
 	user := getRedditUserData(authData)
-	log.Println(user.Name)
+	// failure to get data
+	if user.Name == "" {
+		http.Error(w, "Not authorized", 403)
+		return
+	}
+	clientIp := strings.Split(r.RemoteAddr, ":")[0]
+	AuthorizedIps = append(AuthorizedIps, clientIp)
 	user.Auth = authData
+	user.IP = clientIp
 	// store reddit auth data in the map, Username -> RedditAuth data
 	users[user.Name] = *user
 	expire := time.Now().AddDate(0, 0, 1)

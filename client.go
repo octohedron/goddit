@@ -10,6 +10,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -220,6 +221,18 @@ func (c *Client) writePump() {
 // serveWs handles websocket requests from the peer.
 func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
+	// block clients not present in the list of authorized ips
+	allowed := false
+	clientIp := strings.Split(r.RemoteAddr, ":")[0]
+	for _, ip := range AuthorizedIps {
+		if clientIp == ip {
+			allowed = true
+		}
+	}
+	if !allowed {
+		http.Error(w, "Not authorized", 403)
+		return
+	}
 	log.Printf("Websocket for room: %s \n", vars["channel"])
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
