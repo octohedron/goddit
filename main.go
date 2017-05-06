@@ -77,7 +77,7 @@ type RedditAuth struct {
 	Scope        string `json:"scope"`
 }
 
-const project_root = "/home/vagrant/go/src/github.com/octohedron/goddit"
+const project_root = "/home/ubuntu/go/src/github.com/octohedron/goddit"
 
 var addr = flag.String("addr", ":80", "http service address")
 var src = rand.NewSource(time.Now().UnixNano())
