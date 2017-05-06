@@ -11,7 +11,7 @@
 			var log = document.getElementById("log");
 			var select = document.getElementById("room");
 			var currentRoom = 'AskReddit';
-			var serverAddress = "http://192.168.1.43:9000/";
+			var serverAddress = "goddit.pro";
 			
 			function loadHistory(room) {
 				var authHeader = new Headers();
@@ -89,7 +89,7 @@
 			connectWs(currentRoom);
 			document.getElementById("chat-leave").addEventListener("click", function(e) {
 				e.preventDefault();
-				document.cookie = 'goddit=; value=; path=' + '192.168.1.43:9000/chat' +
+				document.cookie = 'goddit=; value=; path=' + 'goddit.pro/chat' +
 					';expires=Thu, 01 Jan 1970 00:00:01 GMT;';
 				document.location = serverAddress;
 			});

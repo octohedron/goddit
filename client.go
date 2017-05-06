@@ -72,7 +72,7 @@ func (c *Client) readPump() {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
-				log.Printf("error: %v", err)
+				log.Printf("Closing connection: %v", err)
 			}
 			break
 		}
@@ -222,7 +222,7 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Not authorized", 403)
 		return
 	}
-	log.Println(clientIp + " connected via websocket")
+	log.Println(clientIp + " websocket to " + vars["channel"])
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)

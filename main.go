@@ -22,8 +22,8 @@ import (
 const (
 	CLIENT_ID      = "5ao8tf2OzcUFJg"
 	CLIENT_SECRET  = "yeRLdTb3oN6giRbbMs7Tmvm5sYk"
-	SERVER_ADDRESS = "http://192.168.1.43:9000"
-	SERVER_IP      = "192.168.1.43"
+	SERVER_ADDRESS = "goddit.pro"
+	SERVER_IP      = "52.58.76.202"
 	REDIRECT_URI   = SERVER_ADDRESS + "/reddit_callback"
 	letterBytes    = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	letterIdxBits  = 6                    // 6 bits to represent a letter index
@@ -77,9 +77,9 @@ type RedditAuth struct {
 	Scope        string `json:"scope"`
 }
 
-const project_root = "/home/vagrant/go/src/github.com/octohedron/chat"
+const project_root = "/home/vagrant/go/src/github.com/octohedron/goddit"
 
-var addr = flag.String("addr", ":9000", "http service address")
+var addr = flag.String("addr", ":80", "http service address")
 var src = rand.NewSource(time.Now().UnixNano())
 var users map[string]User
 var AuthorizedIps []string
@@ -110,20 +110,16 @@ func chat(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Println(err)
 		panic(err) // didn't find any rooms, something wrong with the DB
-	} else {
-		log.Printf("Found chatrooms: %d \n", len(Rooms))
 	}
 	cookie, err := r.Cookie("goddit")
 	/**
 	 * Cookie not found or user not logged in
 	 */
 	if err != nil || users[cookie.Value].Name == "" {
-		log.Println(err)
 		// respond with forbidden
 		template.Must(template.New("403.html").ParseFiles(
 			project_root+"/403.html")).Execute(w, "")
 	} else {
-		log.Printf("User map in memory \n %+v", users[cookie.Value])
 		template.Must(
 			template.New("chat.html").ParseFiles(
 				project_root+"/chat.html")).Execute(w, struct {
@@ -179,7 +175,7 @@ func redditCallback(w http.ResponseWriter, r *http.Request) {
 		Name:    "goddit",
 		Value:   user.Name,
 		Path:    "/",
-		Domain:  SERVER_IP,
+		Domain:  "goddit.pro",
 	}
 	http.SetCookie(w, cookie)
 	http.Redirect(w, r, SERVER_ADDRESS+"/chat", 302)
