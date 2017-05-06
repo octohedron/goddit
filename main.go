@@ -343,8 +343,6 @@ func channelHistory(w http.ResponseWriter, r *http.Request) {
 				panic(err) // error inserting
 			}
 		}
-	} else { // channel found
-		log.Printf("Found history for channel: %s \n", vars["channel"])
 	}
 	// initialize a slice of size messageAmount to store the messages
 	var messageSlice []Message
@@ -352,7 +350,7 @@ func channelHistory(w http.ResponseWriter, r *http.Request) {
 	err = m.Find(
 		bson.M{"chatRoomId": room.Id}).Sort(
 		"-timestamp").Limit(150).All(&messageSlice)
-	log.Printf("Messages in the channel: %d \n", len(messageSlice))
+	// log.Printf("Messages in the channel: %d \n", len(messageSlice))
 	// get json
 	js, err := json.Marshal(messageSlice)
 	if err != nil {

@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"log"
 )
 
 // hub maintains the set of active clients and broadcasts messages to the

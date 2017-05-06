@@ -218,9 +218,11 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !allowed {
+		log.Println("Bogus request from " + clientIp)
 		http.Error(w, "Not authorized", 403)
 		return
 	}
+	log.Println(clientIp + " connected via websocket")
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
