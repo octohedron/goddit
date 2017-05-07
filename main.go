@@ -20,10 +20,10 @@ import (
 )
 
 const (
-	CLIENT_ID      = "yZyS6F3xixfoBg"
-	CLIENT_SECRET  = "hZMDJJ_QsQtn21SGPbzHDsKE6S8"
-	SERVER_ADDRESS = "http://goddit.pro"
-	SERVER_IP      = "52.58.76.202"
+	CLIENT_ID      = "q70Fh1GM-ekJpQ"
+	CLIENT_SECRET  = "QjbvQrMXRcTgbgRJasEfZ-9Gxjg"
+	SERVER_ADDRESS = "http://192.168.1.43:9000"
+	SERVER_IP      = "192.168.1.43"
 	REDIRECT_URI   = SERVER_ADDRESS + "/reddit_callback"
 	letterBytes    = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	letterIdxBits  = 6                    // 6 bits to represent a letter index
@@ -77,7 +77,7 @@ type RedditAuth struct {
 	Scope        string `json:"scope"`
 }
 
-const project_root = "/home/ubuntu/go/src/github.com/octohedron/goddit"
+const project_root = "/home/vagrant/go/src/github.com/octohedron/goddit"
 
 // var addr = flag.String("addr", ":80", "http service address")
 var src = rand.NewSource(time.Now().UnixNano())
@@ -174,8 +174,8 @@ func redditCallback(w http.ResponseWriter, r *http.Request) {
 		MaxAge:  86400,
 		Name:    "goddit",
 		Value:   user.Name,
-		Path:    "/chat",
-		Domain:  "goddit.pro",
+		Path:    "/",
+		Domain:  "192.168.1.43",
 	}
 	http.SetCookie(w, cookie)
 	http.Redirect(w, r, SERVER_ADDRESS+"/chat", 302)
@@ -380,7 +380,7 @@ func main() {
 		})
 	srv := &http.Server{
 		Handler: r,
-		Addr:    ":80",
+		Addr:    ":9000",
 		// Enforcing timeouts
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
