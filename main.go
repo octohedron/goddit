@@ -14,14 +14,13 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 )
 
 const (
-	CLIENT_ID      = "q70Fh1GM-ekJpQ"
-	CLIENT_SECRET  = "QjbvQrMXRcTgbgRJasEfZ-9Gxjg"
 	SERVER_ADDRESS = "http://192.168.1.43:9000"
 	SERVER_IP      = "192.168.1.43"
 	REDIRECT_URI   = SERVER_ADDRESS + "/reddit_callback"
@@ -83,6 +82,8 @@ const project_root = "/home/vagrant/go/src/github.com/octohedron/goddit"
 var src = rand.NewSource(time.Now().UnixNano())
 var users map[string]User
 var AuthorizedIps []string
+var CLIENT_ID = "q70Fh1GM-ekJpQ"
+var CLIENT_SECRET = "QjbvQrMXRcTgbgRJasEfZ-9Gxjg"
 
 /**
  * Serve the /chat route
@@ -366,6 +367,10 @@ func main() {
 	go getPopularSubreddits()
 	// initialize the user slice
 	users = make(map[string]User)
+	CLIENT_SECRET = os.Getenv("APPSECRET")
+	CLIENT_ID = os.Getenv("APPID")
+	log.Println(CLIENT_ID)
+	log.Println(CLIENT_SECRET)
 	flag.Parse()
 	r := mux.NewRouter()
 	hub := newHub()
