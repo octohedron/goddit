@@ -14,14 +14,13 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 )
 
 const (
-	CLIENT_ID      = "yZyS6F3xixfoBg"
-	CLIENT_SECRET  = "hZMDJJ_QsQtn21SGPbzHDsKE6S8"
 	SERVER_ADDRESS = "http://goddit.pro"
 	SERVER_IP      = "52.58.76.202"
 	REDIRECT_URI   = SERVER_ADDRESS + "/reddit_callback"
@@ -83,6 +82,8 @@ const project_root = "/home/ubuntu/go/src/github.com/octohedron/goddit"
 var src = rand.NewSource(time.Now().UnixNano())
 var users map[string]User
 var AuthorizedIps []string
+var CLIENT_ID = "YOUR_APP_ID"
+var CLIENT_SECRET = "YOUR_APP_SECRET"
 
 /**
  * Serve the /chat route
@@ -174,7 +175,7 @@ func redditCallback(w http.ResponseWriter, r *http.Request) {
 		MaxAge:  86400,
 		Name:    "goddit",
 		Value:   user.Name,
-		Path:    "/chat",
+		Path:    "/",
 		Domain:  "goddit.pro",
 	}
 	http.SetCookie(w, cookie)
@@ -366,6 +367,8 @@ func main() {
 	go getPopularSubreddits()
 	// initialize the user slice
 	users = make(map[string]User)
+	CLIENT_ID = os.Getenv("APPID")
+	CLIENT_SECRET = os.Getenv("APPSECRET")
 	flag.Parse()
 	r := mux.NewRouter()
 	hub := newHub()

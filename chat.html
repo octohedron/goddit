@@ -90,8 +90,20 @@
 			connectWs(currentRoom);
 			document.getElementById("chat-leave").addEventListener("click", function(e) {
 				e.preventDefault();
-				document.cookie = 'goddit=; value=; path=goddit.pro/chat' +
-					';expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+			//remove cookies at / and at /chat
+			var domain = location.hostname;
+			document.cookie = [
+				'goddit=',
+				'; expires=' + new Date(0).toUTCString(),
+				'; path=/',
+				'; domain=' + domain
+			].join('');
+			document.cookie = [
+				'goddit=',
+				'; expires=' + new Date(0).toUTCString(),
+				'; path=/chat',
+				'; domain=' + domain
+			].join('');
 				document.location = serverAddress;
 			});
 			document.getElementById("submit").addEventListener("click", function(e) {
@@ -279,7 +291,7 @@
 				<div class="row current-chat-footer">
 					<div class="panel-footer">
 						<div class="input-group">
-							<input type="text" class="form-control" id="msg">
+							<input type="text" class="form-control" id="msg" autocomplete="off">
 							<span class="input-group-btn">
 					<button class="btn btn-default" type="button" id="submit">Send</button>
 				  </span>
