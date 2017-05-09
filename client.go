@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"log"
 	"net/http"
@@ -94,30 +93,18 @@ func (c *Client) readPump() {
 }
 
 func saveMessage(message *Message) {
-	// connect to the database
-	session, err := mgo.Dial("127.0.0.1")
-	if err != nil {
-		panic(err)
-	}
-	defer session.Close()
-	// set message id and creation date
 	message.MessageId = bson.NewObjectId()
 	message.Timestamp = time.Now()
-	// close the session when done
-	session.SetMode(mgo.Monotonic, true)
-	// select the collections to work with
-	c := session.DB("views").C("chatrooms")
-	m := session.DB("views").C("messages")
 	var room Chatroom
 	// find the chatroom at this request
-	err = c.Find(bson.M{"name": message.ChatRoomName}).One(&room)
+	err := Mongo.Chatrooms.Find(bson.M{"name": message.ChatRoomName}).One(&room)
 	if err != nil { // channel not found
 		// create new channel
 		room.Name = message.ChatRoomName
 		room.Level = "0"
 		room.Active = "true"
 		room.Id = bson.NewObjectId()
-		err := c.Insert(room)
+		err := Mongo.Chatrooms.Insert(room)
 		if err != nil {
 			log.Println(err)
 		} else {
@@ -128,14 +115,14 @@ func saveMessage(message *Message) {
 	message.ChatRoomId = room.Id
 	// insert the message into the messages collection, with this chatroom
 	// and the user id
-	err = m.Insert(message)
+	err = Mongo.Messages.Insert(message)
 	if err != nil {
 		panic(err) // error inserting
 	}
 	var messageSlice []Message
 	var bsonMessageSlice []bson.ObjectId
 	// find all the messages that have this room as chatRoomId
-	err = m.Find(
+	err = Mongo.Messages.Find(
 		bson.M{"chatRoomId": room.Id}).Sort("-timestamp").All(&messageSlice)
 	if err != nil {
 		panic(err)
@@ -153,7 +140,7 @@ func saveMessage(message *Message) {
 	bsonMessageSlice = append(bsonMessageSlice, message.MessageId)
 	// update the room with the new messsage
 	// Update the chatroom with this room's id, adding the last message
-	err = c.Update(bson.M{"_id": room.Id},
+	err = Mongo.Chatrooms.Update(bson.M{"_id": room.Id},
 		bson.M{"$set": bson.M{"messages": bsonMessageSlice}})
 	if err != nil {
 		panic(err)
@@ -222,7 +209,7 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Not authorized", 403)
 		return
 	}
-	log.Println(clientIp + " websocket to " + vars["channel"])
+	// log.Println(clientIp + " websocket to " + vars["channel"])
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)

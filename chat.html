@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-	<title>Welcome to reddit chat</title>
+	<title>Welcome to Goddit | reddit chat</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<script type="text/javascript">
 		window.onload = function() {
 			var conn;
@@ -89,10 +90,20 @@
 			connectWs(currentRoom);
 			document.getElementById("chat-leave").addEventListener("click", function(e) {
 				e.preventDefault();
-				document.cookie = 'goddit=; value=; path=192.168.1.43:9000/' +
-					';expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-				document.cookie = 'goddit=; value=; path=192.168.1.43:9000/chat' +
-					';expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+			//remove cookies at / and at /chat
+			var domain = location.hostname;
+			document.cookie = [
+				'goddit=',
+				'; expires=' + new Date(0).toUTCString(),
+				'; path=/',
+				'; domain=' + domain
+			].join('');
+			document.cookie = [
+				'goddit=',
+				'; expires=' + new Date(0).toUTCString(),
+				'; path=/chat',
+				'; domain=' + domain
+			].join('');
 				document.location = serverAddress;
 			});
 			document.getElementById("submit").addEventListener("click", function(e) {
@@ -181,8 +192,7 @@
 			});
 			// add active to first chat channel when loading the page
 			$(".media-list a").first().addClass("active");
-		}
-	</script>
+		}</script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js" crossorigin="anonymous"></script>
 	<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
 	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
@@ -247,7 +257,7 @@
 <body>
 	<div class="container-fluid">
 		<div class="row">
-			<div class="col-md-2 col-lg-2 col-sm-6">
+			<div class="col-lg-2 col-md-2 col-xs-12">
 				<div class="row chats-row">
 					<!-- SUBREDDITS -->
 					<div class="media-list" id="rooms">
@@ -257,7 +267,7 @@
 					</div>
 				</div>
 			</div>
-			<div class="col-md-10 col-lg-10 col-sm-6 current-chat">
+			<div class="col-lg-10 col-md-10 col-xs-12 current-chat">
 				<div class="row chat-toolbar-row">
 					<div class="col-sm-12">
 						<div class="btn-group chat-toolbar" role="group" aria-label="...">
@@ -281,7 +291,7 @@
 				<div class="row current-chat-footer">
 					<div class="panel-footer">
 						<div class="input-group">
-							<input type="text" class="form-control" id="msg">
+							<input type="text" class="form-control" id="msg" autocomplete="off">
 							<span class="input-group-btn">
 					<button class="btn btn-default" type="button" id="submit">Send</button>
 				  </span>
