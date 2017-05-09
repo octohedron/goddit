@@ -47,21 +47,16 @@ func (h *Hub) run() {
 			}
 			// only send message to clients that belong to this hub
 			for client := range h.clients {
-				// if client belongs to (message.room)
 				// only send the message to the people in the room
 				if client.room == msg.ChatRoomName {
 					// log.Printf("Client room: %s message room: %s \n",
 					// 	client.room, msg.ChatRoomName)
 					select {
-					// send only to the client if the message belongs to this room.
 					case client.send <- message:
 					default:
 						close(client.send)
 						delete(h.clients, client)
 					}
-				} else {
-					// log.Printf("Client room: doesn't match %s message room: %s \n",
-					// 	client.room, msg.ChatRoomName)
 				}
 			}
 		}
