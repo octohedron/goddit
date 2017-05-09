@@ -76,6 +76,12 @@ type RedditAuth struct {
 	Scope        string `json:"scope"`
 }
 
+type MongoDBConnections struct {
+	Session   *mgo.Session
+	Messages  *mgo.Collection
+	Chatrooms *mgo.Collection
+}
+
 const project_root = "/home/ubuntu/go/src/github.com/octohedron/goddit"
 
 // var addr = flag.String("addr", ":80", "http service address")
@@ -84,6 +90,15 @@ var users map[string]User
 var AuthorizedIps []string
 var CLIENT_ID = "YOUR_APP_ID"
 var CLIENT_SECRET = "YOUR_APP_SECRET"
+var Mongo *MongoDBConnections
+
+func newMongoDBConnections(session *mgo.Session, m *mgo.Collection, c *mgo.Collection) *MongoDBConnections {
+	return &MongoDBConnections{
+		Session:   session,
+		Messages:  m,
+		Chatrooms: c,
+	}
+}
 
 /**
  * Serve the /chat route
@@ -96,18 +111,8 @@ func chat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", 405)
 		return
 	}
-	// connect to the database
-	session, err := mgo.Dial("127.0.0.1")
-	if err != nil {
-		panic(err)
-	}
-	// close the session when done
-	defer session.Close()
-	session.SetMode(mgo.Monotonic, true)
-	c := session.DB("views").C("chatrooms")
-	// find all subreddits
 	var Rooms []Chatroom
-	err = c.Find(nil).All(&Rooms)
+	err := Mongo.Chatrooms.Find(nil).All(&Rooms)
 	if err != nil {
 		log.Println(err)
 		panic(err) // didn't find any rooms, something wrong with the DB
@@ -224,16 +229,8 @@ func getPopularSubreddits() {
 		log.Println(err)
 		return
 	}
-	// store in mongodb
-	session, err := mgo.Dial("127.0.0.1")
-	if err != nil {
-		panic(err)
-	}
-	// close the session when done
-	defer session.Close()
-	session.SetMode(mgo.Monotonic, true)
-	c := session.DB("views").C("chatrooms")
-	bulkT := c.Bulk()
+
+	bulkT := Mongo.Chatrooms.Bulk()
 	bulkT.Unordered() // Avoid dupes (?)
 	// Index
 	index := mgo.Index{
@@ -243,7 +240,7 @@ func getPopularSubreddits() {
 		Background: true,
 		Sparse:     true,
 	}
-	err = c.EnsureIndex(index)
+	err = Mongo.Chatrooms.EnsureIndex(index)
 	for i := 0; i < 25; i++ {
 		name, err := parser.Query("data.children.[" +
 			strconv.Itoa(i) + "].data.display_name")
@@ -298,19 +295,9 @@ func channelHistory(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Forbidden", 403)
 		return
 	}
-	// connect to the database
-	session, err := mgo.Dial("127.0.0.1")
-	if err != nil {
-		panic(err)
-	}
-	// close the session when done
-	defer session.Close()
-	session.SetMode(mgo.Monotonic, true)
-	c := session.DB("views").C("chatrooms")
-	m := session.DB("views").C("messages")
 	var room Chatroom
 	// find the chatroom at this request
-	err = c.Find(bson.M{"name": vars["channel"]}).One(&room)
+	err := Mongo.Chatrooms.Find(bson.M{"name": vars["channel"]}).One(&room)
 	if err != nil { // channel not found
 		log.Printf("Creating new channel: %s ...", vars["channel"])
 		// create new channel
@@ -318,7 +305,7 @@ func channelHistory(w http.ResponseWriter, r *http.Request) {
 		room.Name = vars["channel"]
 		room.Level = "0"
 		room.Active = "true"
-		err := c.Insert(room)
+		err := Mongo.Chatrooms.Insert(room)
 		if err != nil {
 			log.Println(err)
 		} else {
@@ -335,7 +322,7 @@ func channelHistory(w http.ResponseWriter, r *http.Request) {
 			room.Messages = append(room.Messages, welcomeMessage.MessageId)
 			// insert the new welcome message into the messages
 			// collection, with this chatroom id and the user id
-			err = m.Insert(welcomeMessage)
+			err = Mongo.Messages.Insert(welcomeMessage)
 			if err != nil {
 				panic(err) // error inserting
 			}
@@ -344,7 +331,7 @@ func channelHistory(w http.ResponseWriter, r *http.Request) {
 	// initialize a slice of size messageAmount to store the messages
 	var messageSlice []Message
 	// find the last 150 messages in the room
-	err = m.Find(
+	err = Mongo.Messages.Find(
 		bson.M{"chatRoomId": room.Id}).Sort(
 		"-timestamp").Limit(150).All(&messageSlice)
 	// log.Printf("Messages in the channel: %d \n", len(messageSlice))
@@ -363,6 +350,16 @@ func channelHistory(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// connect to the database
+	session, err := mgo.Dial("127.0.0.1")
+	if err != nil {
+		panic(err)
+	}
+	session.SetMode(mgo.Monotonic, true)
+	m := session.DB("views").C("messages")
+	c := session.DB("views").C("chatrooms")
+	defer session.Close()
+	Mongo = newMongoDBConnections(session, m, c)
 	// gets the subreddits and stores them in the DB
 	go getPopularSubreddits()
 	// initialize the user slice
@@ -388,7 +385,7 @@ func main() {
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}
-	err := srv.ListenAndServe()
+	err = srv.ListenAndServe()
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
