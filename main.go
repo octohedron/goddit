@@ -14,6 +14,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -72,8 +73,6 @@ type RedditAuth struct {
 	Scope        string `json:"scope"`
 }
 
-const project_root = "/home/vagrant/go/src/github.com/octohedron/goddit"
-
 type MongoDBConnections struct {
 	Session   *mgo.Session
 	Messages  *mgo.Collection
@@ -87,6 +86,8 @@ var DOMAIN = "192.168.1.43"
 var GPORT = "9000"
 var REDIRECT_URI = SERVER_ADDRESS + "/reddit_callback"
 var SERVER_ADDRESS = "http://192.168.1.43:9000"
+var PROJ_ROOT = "/home/vagrant/go/src/github.com/octohedron/goddit"
+var COOKIE_NAME = "goddit"
 
 // mem
 var users map[string]User
@@ -120,43 +121,43 @@ func chat(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		panic(err) // didn't find any rooms, something wrong with the DB
 	}
-	cookie, err := r.Cookie("goddit")
+	cookie, err := r.Cookie(COOKIE_NAME)
 	/**
 	 * Cookie not found or user not logged in
 	 */
 	if err != nil || users[cookie.Value].Name == "" {
 		// respond with forbidden
 		template.Must(template.New("403.html").ParseFiles(
-			project_root+"/403.html")).Execute(w, "")
+			PROJ_ROOT+"/403.html")).Execute(w, "")
 	} else {
 		template.Must(
 			template.New("chat.html").ParseFiles(
-				project_root+"/chat.html")).Execute(w, struct {
-			Domain     string
+				PROJ_ROOT+"/chat.html")).Execute(w, struct {
+			CookieName string
 			ServerAddr string
 			Username   string
 			Chatrooms  []Chatroom
-		}{DOMAIN, SERVER_ADDRESS, users[cookie.Value].Name, Rooms})
+		}{COOKIE_NAME, SERVER_ADDRESS, users[cookie.Value].Name, Rooms})
 	}
 }
 
+// If the user is already logged in, redirect to the /chat
 func index(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", 405)
 		return
 	}
-	cookie, err := r.Cookie("goddit")
+	cookie, err := r.Cookie(COOKIE_NAME)
 	if err != nil || users[cookie.Value].Name == "" {
 		state := getRandomString(8)
 		url := "https://ssl.reddit.com/api/v1/authorize?" + "client_id=" +
 			CLIENT_ID + "&response_type=code&state=" + state + "&redirect_uri=" +
 			REDIRECT_URI + "&duration=temporary&scope=identity"
 		template.Must(template.New("index.html").ParseFiles(
-			project_root+"/index.html")).Execute(w, struct {
+			PROJ_ROOT+"/index.html")).Execute(w, struct {
 			Url string
 		}{url})
 	} else {
-		log.Println("Found cookie " + cookie.Value)
 		http.Redirect(w, r, SERVER_ADDRESS+"/chat", 302)
 	}
 }
@@ -183,7 +184,7 @@ func redditCallback(w http.ResponseWriter, r *http.Request) {
 	cookie := &http.Cookie{
 		Expires: expire,
 		MaxAge:  86400,
-		Name:    "goddit",
+		Name:    COOKIE_NAME,
 		Value:   user.Name,
 		Path:    "/",
 		Domain:  "192.168.1.43",
@@ -428,7 +429,9 @@ func main() {
 	SERVER_ADDRESS = os.Getenv("GODDITADDR")
 	DOMAIN = os.Getenv("GODDITDOMAIN")
 	GPORT = os.Getenv("GPORT")
+	COOKIE_NAME = os.Getenv("GCOOKIE")
 	REDIRECT_URI = SERVER_ADDRESS + "/reddit_callback"
+	PROJ_ROOT, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	// connect to the database
 	session, err := mgo.Dial("127.0.0.1")
 	if err != nil {
@@ -447,6 +450,7 @@ func main() {
 	r := mux.NewRouter()
 	hub := newHub()
 	go hub.run()
+	log.Println(PROJ_ROOT + "/icons")
 	r.HandleFunc("/", index)
 	r.HandleFunc("/chat", chat)
 	r.HandleFunc("/reddit_callback", redditCallback)
@@ -455,6 +459,7 @@ func main() {
 		func(w http.ResponseWriter, r *http.Request) {
 			serveWs(hub, w, r)
 		})
+	r.PathPrefix("/").Handler(http.StripPrefix("/", http.FileServer(http.Dir(PROJ_ROOT+"/icons"))))
 	srv := &http.Server{
 		Handler:      r,
 		Addr:         ":" + GPORT,
