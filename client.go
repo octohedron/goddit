@@ -6,13 +6,13 @@ import (
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
-	"strings"
+	// "strings"
 	"time"
 )
 
 const (
 	// Time allowed to write a message to the peer.
-	writeWait = 10 * time.Millisecond
+	writeWait = 10 * time.Second
 
 	// Time allowed to read the next pong message from the peer.
 	pongWait = 60 * time.Second
@@ -130,16 +130,9 @@ func (c *Client) writePump() {
 // serveWs handles websocket requests from the peer.
 func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	// block clients not present in the list of authorized ips
-	allowed := false
-	clientIp := strings.Split(r.RemoteAddr, ":")[0]
-	for _, ip := range AuthorizedIps {
-		if clientIp == ip {
-			allowed = true
-		}
-	}
-	if !allowed {
-		log.Println("Bogus request from " + clientIp)
+	cookie, err := r.Cookie(COOKIE_NAME)
+	if err != nil || users[cookie.Value].Name == "" {
+		log.Println("Bogus request")
 		http.Error(w, "Not authorized", 403)
 		return
 	}
@@ -156,6 +149,8 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		save: &MessageChannel,
 	}
 	client.hub.register <- client
+	// one goroutine for each client for reading and another for sending
+	// messages to and from the hub to the WebSocket
 	go client.writePump()
 	go client.readPump()
 }

@@ -69,9 +69,14 @@
 				let firstChild = log.firstChild;
 				log.insertBefore(item, firstChild);
 				// scroll to last item
-				Array.from(document.querySelectorAll("#log li")).pop().scrollIntoView(true);
+				Array.from(document.querySelectorAll("#log li"))
+					.pop().scrollIntoView(true);
+				// scroll to bottom of the page, for mobile
+				document.querySelector("#msg").scrollIntoView(true);
 			}
-
+			document.addEventListener('focusout', function(e) {
+					document.querySelector("#msg").scrollIntoView(true);
+			});
 			function printMessage(message, isHistory) {
 				var item = document.createElement("li");
 				if (message.name === "Moderator") {
@@ -91,7 +96,7 @@
 						<div class="media-body">
 							<div class="media">
 								<a class="pull-left" href="#">
-									<img class="media-object img-circle " src="http://placeskull.com/50/50/${color}">
+									<img class="media-object img-circle " src="http://placeskull.com/40/40/${color}">
 								</a>
 								<div class="media-body">
 									${text}
@@ -113,20 +118,20 @@
 			connectWs(currentRoom);
 			document.getElementById("chat-leave").addEventListener("click", function(e) {
 				e.preventDefault();
-			//remove cookies at / and at /chat
-			var domain = location.hostname;
-			document.cookie = [
-				'{{ .CookieName }}=',
-				'; expires=' + new Date(0).toUTCString(),
-				'; path=/',
-				'; domain=' + domain
-			].join('');
-			document.cookie = [
-				'{{ .CookieName }}=',
-				'; expires=' + new Date(0).toUTCString(),
-				'; path=/chat',
-				'; domain=' + domain
-			].join('');
+				//remove cookies at / and at /chat
+				var domain = location.hostname;
+				document.cookie = [
+					'{{ .CookieName }}=',
+					'; expires=' + new Date(0).toUTCString(),
+					'; path=/',
+					'; domain=' + domain
+				].join('');
+				document.cookie = [
+					'{{ .CookieName }}=',
+					'; expires=' + new Date(0).toUTCString(),
+					'; path=/chat',
+					'; domain=' + domain
+				].join('');
 				document.location = serverAddress;
 			});
 			document.getElementById("submit").addEventListener("click", function(e) {
@@ -187,6 +192,16 @@
 					connectWs(e.target.text);
 					loadHistory(e.target.text);
 					currentRoom = e.target.text;
+				}
+			}, false);
+			document.getElementById("rooms-mobile").addEventListener("click", function(e) {
+				if (e.target && e.target.nodeName == "A") {
+					e.preventDefault();
+					conn.close();
+					connectWs(e.target.text);
+					loadHistory(e.target.text);
+					currentRoom = e.target.text;
+					$("#subreddits-modal").modal('hide');
 				}
 			}, false);
 
@@ -258,6 +273,15 @@
 			width: 100% !important;
 			margin-top: 10px;
 			margin-bottom: 10px;
+			text-align: center;
+		}
+		.btn-change-room{
+	    width: 110px;
+	    display: inline-block;
+  	  margin-right: auto;
+    	text-align: center;
+    	float: none;
+
 		}
 		.current-chat-area {
 			padding-top: 10px;
@@ -265,9 +289,32 @@
 			height: 85vh;
 		}
 		.current-chat-footer {
-			position: absolute;
-			bottom: 0;
-			width: 100%;
+				position: absolute; 
+				bottom: 0;
+				width: 100%;
+			}
+		@media screen and (max-width: 991px){
+			.current-chat-footer {
+				position: relative; 
+				bottom: 0;
+				width: 100vw;
+			}
+			.btn-change-room {
+		    width: 110px;
+		    display: inline-block !important;
+		    margin-right: auto;
+		    text-align: center;
+		    float: none !important;
+			}
+			.chat-toolbar {
+				padding-top: 10px !important;
+				text-align: center;
+			}
+			.current-chat-area {
+				padding-top: 10px;
+				overflow: auto;
+				height: 80vh;
+			}
 		}
 		#rooms {
 			height: auto;
@@ -283,7 +330,7 @@
 <body>
 	<div class="container-fluid">
 		<div class="row">
-			<div class="col-lg-2 col-md-2 col-xs-12">
+			<div class="col-lg-2 col-md-2 hidden-xs">
 				<div class="row chats-row">
 					<!-- SUBREDDITS -->
 					<div class="media-list" id="rooms">
@@ -291,15 +338,17 @@
 							<a href="#" class="list-group-item">{{ .Name }}</a> 
 						{{end}}
 					</div>
+					<!-- END SUBREDDITS -->
 				</div>
 			</div>
 			<div class="col-lg-10 col-md-10 col-xs-12 current-chat">
 				<div class="row chat-toolbar-row">
-					<div class="col-sm-12">
+					<div class="col-sm-12 col-xs-12 ">
 						<div class="btn-group chat-toolbar" role="group" aria-label="...">
 							<a href="#" id="chat-leave" class="btn btn-default ticket-option" 
 								type="button">
 								<i class="glyphicon glyphicon-remove-sign"></i> Leave Chat </a>
+								<button type="button" class="btn btn-primary visible-xs btn-change-room" data-toggle="modal" data-target="#subreddits-modal">Change Room</button>
 							<a class="twitter-share-button" 
 								href="https://twitter.com/intent/tweet?text=Check out this reddit chat&url={{ .ServerAddr }}"
 							  data-size="large"> Tweet
@@ -327,6 +376,19 @@
 			</div>
 		</div>
 	</div>
+
+	<div class="modal fade" tabindex="-1" role="dialog" id="subreddits-modal" aria-labelledby="mySmallModalLabel">
+	  <div class="modal-dialog modal-sm" role="document">
+	    <div class="modal-content">
+	      <div class="media-list" id="rooms-mobile">
+						{{range $i, $a := .Chatrooms}}
+							<a href="#" class="list-group-item">{{ .Name }}</a> 
+						{{end}}
+					</div>
+	    </div>
+	  </div>
+	</div>
+
 	<script>window.twttr = (function(d, s, id) {
   var js, fjs = d.getElementsByTagName(s)[0],
     t = window.twttr || {};

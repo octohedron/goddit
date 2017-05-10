@@ -14,7 +14,6 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -86,8 +85,8 @@ var DOMAIN = "192.168.1.43"
 var GPORT = "9000"
 var REDIRECT_URI = SERVER_ADDRESS + "/reddit_callback"
 var SERVER_ADDRESS = "http://192.168.1.43:9000"
-var PROJ_ROOT = "/home/ubuntu/go/src/github.com/octohedron/goddit"
 var COOKIE_NAME = "goddit"
+var PROJ_ROOT = ""
 
 // mem
 var users map[string]User
@@ -95,12 +94,17 @@ var AuthorizedIps []string
 var Mongo *MongoDBConnections
 var MessageChannel chan []byte
 
-func newMongoDBConnections(session *mgo.Session, m *mgo.Collection,
-	c *mgo.Collection) *MongoDBConnections {
+func newMongoDBConnections() *MongoDBConnections {
+	// connect to the database
+	session, err := mgo.Dial("127.0.0.1")
+	if err != nil {
+		panic(err)
+	}
+	session.SetMode(mgo.Monotonic, true)
 	return &MongoDBConnections{
 		Session:   session,
-		Messages:  m,
-		Chatrooms: c,
+		Messages:  session.DB("views").C("messages"),
+		Chatrooms: session.DB("views").C("chatrooms"),
 	}
 }
 
@@ -150,7 +154,7 @@ func index(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie(COOKIE_NAME)
 	if err != nil || users[cookie.Value].Name == "" {
 		state := getRandomString(8)
-		url := "https://ssl.reddit.com/api/v1/authorize?" + "client_id=" +
+		url := "https://ssl.reddit.com/api/v1/authorize.compact?" + "client_id=" +
 			CLIENT_ID + "&response_type=code&state=" + state + "&redirect_uri=" +
 			REDIRECT_URI + "&duration=temporary&scope=identity"
 		template.Must(template.New("index.html").ParseFiles(
@@ -169,9 +173,9 @@ func redditCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	authData := getRedditAuth(r.FormValue("code"))
 	user := getRedditUserData(authData)
-	// failure to get data
+	// failure to get data, redirect to /
 	if user.Name == "" {
-		http.Error(w, "Not authorized", 403)
+		http.Redirect(w, r, SERVER_ADDRESS+"/", 302)
 		return
 	}
 	clientIp := strings.Split(r.RemoteAddr, ":")[0]
@@ -422,6 +426,14 @@ func saveMessage(msg *[]byte) {
 	}
 }
 
+func init() {
+	ROOT, err := os.Getwd()
+	if err != nil {
+		log.Println(err)
+	}
+	PROJ_ROOT = ROOT
+}
+
 func main() {
 	// env variables
 	CLIENT_ID = os.Getenv("APPID")
@@ -431,29 +443,18 @@ func main() {
 	GPORT = os.Getenv("GPORT")
 	COOKIE_NAME = os.Getenv("GCOOKIE")
 	REDIRECT_URI = SERVER_ADDRESS + "/reddit_callback"
-	PROJ_ROOT, err := filepath.Abs(filepath.Dir(os.Args[0]))
-	if err != nil {
-		log.Println(err)
-	}
-	// connect to the database
-	session, err := mgo.Dial("127.0.0.1")
-	if err != nil {
-		panic(err)
-	}
-	session.SetMode(mgo.Monotonic, true)
-	Mongo = newMongoDBConnections(
-		session, session.DB("views").C("messages"),
-		session.DB("views").C("chatrooms"))
+	// set database
+	Mongo = newMongoDBConnections()
 	MessageChannel = make(chan []byte, 256)
 	// a goroutine for saving messages
 	go saveMessages(&MessageChannel)
+	// crawl popular subreddits
 	go getPopularSubreddits()
 	//for keeping track of users in memory
 	users = make(map[string]User)
 	r := mux.NewRouter()
 	hub := newHub()
 	go hub.run()
-	log.Println(PROJ_ROOT + "/icons")
 	r.HandleFunc("/", index)
 	r.HandleFunc("/chat", chat)
 	r.HandleFunc("/reddit_callback", redditCallback)
@@ -469,7 +470,7 @@ func main() {
 		WriteTimeout: 5 * time.Second,
 		ReadTimeout:  5 * time.Second,
 	}
-	err = srv.ListenAndServe()
+	err := srv.ListenAndServe()
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
