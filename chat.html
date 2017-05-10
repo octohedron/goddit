@@ -12,7 +12,7 @@
 			var log = document.getElementById("log");
 			var select = document.getElementById("room");
 			var currentRoom = 'AskReddit';
-			var serverAddress = "http://192.168.1.43:9000";
+			var serverAddress = "{{ .ServerAddr }}";
 			
 			function loadHistory(room) {
 				var authHeader = new Headers();
@@ -93,13 +93,13 @@
 			//remove cookies at / and at /chat
 			var domain = location.hostname;
 			document.cookie = [
-				'goddit=',
+				'{{ .Domain }}=',
 				'; expires=' + new Date(0).toUTCString(),
 				'; path=/',
 				'; domain=' + domain
 			].join('');
 			document.cookie = [
-				'goddit=',
+				'{{ .Domain }}=',
 				'; expires=' + new Date(0).toUTCString(),
 				'; path=/chat',
 				'; domain=' + domain
@@ -275,7 +275,7 @@
 								type="button">
 								<i class="glyphicon glyphicon-remove-sign"></i> Leave Chat </a>
 							<a class="twitter-share-button" 
-								href="https://twitter.com/intent/tweet?text=Check out this reddit chat&url=http://192.168.1.43:9000"
+								href="https://twitter.com/intent/tweet?text=Check out this reddit chat&url={{ .ServerAddr }}"
 							  data-size="large"> Tweet
 							</a>
 						</div>

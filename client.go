@@ -2,10 +2,8 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	"gopkg.in/mgo.v2/bson"
 	"log"
 	"net/http"
 	"strings"
@@ -14,7 +12,7 @@ import (
 
 const (
 	// Time allowed to write a message to the peer.
-	writeWait = 10 * time.Second
+	writeWait = 10 * time.Millisecond
 
 	// Time allowed to read the next pong message from the peer.
 	pongWait = 60 * time.Second
@@ -49,6 +47,9 @@ type Client struct {
 
 	// Buffered channel of outbound messages.
 	send chan []byte
+
+	// a reference to the save channel
+	save *chan []byte
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -70,80 +71,15 @@ func (c *Client) readPump() {
 	for {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
-				log.Printf("Closing connection: %v", err)
-			}
 			break
 		}
 		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
-		msg := Message{}
-		err = json.Unmarshal(message, &msg)
-		// log.Printf("%+v\n", msg)
-		// log.Println(msg.UserName)
-		// log.Println(msg.Text)
 		if err != nil {
 			panic(err)
 		}
-		// log.Println(string(message[:]))
-		saveMessage(&msg)
-		// make hub broadcast the message
-		c.hub.broadcast <- message // broadcast the json
-		// c.hub.broadcast <- []byte(msg.UserName + ": " + msg.Text)
-	}
-}
-
-func saveMessage(message *Message) {
-	message.MessageId = bson.NewObjectId()
-	message.Timestamp = time.Now()
-	var room Chatroom
-	// find the chatroom at this request
-	err := Mongo.Chatrooms.Find(bson.M{"name": message.ChatRoomName}).One(&room)
-	if err != nil { // channel not found
-		// create new channel
-		room.Name = message.ChatRoomName
-		room.Level = "0"
-		room.Active = "true"
-		room.Id = bson.NewObjectId()
-		err := Mongo.Chatrooms.Insert(room)
-		if err != nil {
-			log.Println(err)
-		} else {
-			room.Messages = append(room.Messages, message.MessageId)
-		}
-	}
-	// construct the new message
-	message.ChatRoomId = room.Id
-	// insert the message into the messages collection, with this chatroom
-	// and the user id
-	err = Mongo.Messages.Insert(message)
-	if err != nil {
-		panic(err) // error inserting
-	}
-	var messageSlice []Message
-	var bsonMessageSlice []bson.ObjectId
-	// find all the messages that have this room as chatRoomId
-	err = Mongo.Messages.Find(
-		bson.M{"chatRoomId": room.Id}).Sort("-timestamp").All(&messageSlice)
-	if err != nil {
-		panic(err)
-	}
-	if len(messageSlice) > 0 {
-		if err != nil {
-			log.Println(err)
-		}
-		// if there is no messages it won't enter the loop
-		for i := 0; i < len(messageSlice); i++ {
-			bsonMessageSlice = append(bsonMessageSlice, messageSlice[i].MessageId)
-		}
-	}
-	// append the new message
-	bsonMessageSlice = append(bsonMessageSlice, message.MessageId)
-	// update the room with the new messsage
-	// Update the chatroom with this room's id, adding the last message
-	err = Mongo.Chatrooms.Update(bson.M{"_id": room.Id},
-		bson.M{"$set": bson.M{"messages": bsonMessageSlice}})
-	if err != nil {
-		panic(err)
+		c.hub.broadcast <- message
+		// send message to the save channel
+		*c.save <- message
 	}
 }
 
@@ -161,14 +97,12 @@ func (c *Client) writePump() {
 	for {
 		select {
 		case message, ok := <-c.send:
-			// add 10 sec for writing as a deadline
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel.
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
-
 			w, err := c.conn.NextWriter(websocket.TextMessage)
 			if err != nil {
 				return
@@ -209,7 +143,6 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Not authorized", 403)
 		return
 	}
-	// log.Println(clientIp + " websocket to " + vars["channel"])
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
@@ -220,8 +153,9 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		hub:  hub,
 		conn: conn,
 		send: make(chan []byte, 256),
+		save: &MessageChannel,
 	}
 	client.hub.register <- client
 	go client.writePump()
-	client.readPump()
+	go client.readPump()
 }

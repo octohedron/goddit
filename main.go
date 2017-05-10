@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"flag"
 	"github.com/elgs/gojq"
 	"github.com/gorilla/mux"
 	"gopkg.in/mgo.v2"
@@ -21,13 +20,10 @@ import (
 )
 
 const (
-	SERVER_ADDRESS = "http://192.168.1.43:9000"
-	SERVER_IP      = "192.168.1.43"
-	REDIRECT_URI   = SERVER_ADDRESS + "/reddit_callback"
-	letterBytes    = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	letterIdxBits  = 6                    // 6 bits to represent a letter index
-	letterIdxMask  = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
-	letterIdxMax   = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
+	letterBytes   = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	letterIdxBits = 6                    // 6 bits to represent a letter index
+	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
+	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
 )
 
 type User struct {
@@ -84,15 +80,22 @@ type MongoDBConnections struct {
 	Chatrooms *mgo.Collection
 }
 
-// var addr = flag.String("addr", ":80", "http service address")
-var src = rand.NewSource(time.Now().UnixNano())
-var users map[string]User
-var AuthorizedIps []string
+// env
 var CLIENT_ID = "YOUR_APP_ID"
 var CLIENT_SECRET = "YOUR_APP_SECRET"
-var Mongo *MongoDBConnections
+var DOMAIN = "192.168.1.43"
+var GPORT = "9000"
+var REDIRECT_URI = SERVER_ADDRESS + "/reddit_callback"
+var SERVER_ADDRESS = "http://192.168.1.43:9000"
 
-func newMongoDBConnections(session *mgo.Session, m *mgo.Collection, c *mgo.Collection) *MongoDBConnections {
+// mem
+var users map[string]User
+var AuthorizedIps []string
+var Mongo *MongoDBConnections
+var MessageChannel chan []byte
+
+func newMongoDBConnections(session *mgo.Session, m *mgo.Collection,
+	c *mgo.Collection) *MongoDBConnections {
 	return &MongoDBConnections{
 		Session:   session,
 		Messages:  m,
@@ -129,9 +132,11 @@ func chat(w http.ResponseWriter, r *http.Request) {
 		template.Must(
 			template.New("chat.html").ParseFiles(
 				project_root+"/chat.html")).Execute(w, struct {
-			Username  string
-			Chatrooms []Chatroom
-		}{cookie.Value, Rooms}) // remember to change to name.value!
+			Domain     string
+			ServerAddr string
+			Username   string
+			Chatrooms  []Chatroom
+		}{DOMAIN, SERVER_ADDRESS, users[cookie.Value].Name, Rooms})
 	}
 }
 
@@ -210,7 +215,6 @@ func getRedditUserData(auth RedditAuth) *User {
 }
 
 func getPopularSubreddits() {
-	// log.Println("Getting subreddit data")
 	client := &http.Client{}
 	req, err := http.NewRequest("GET",
 		"https://www.reddit.com/subreddits/popular/.json", nil)
@@ -280,7 +284,6 @@ func getRedditAuth(code string) RedditAuth {
 	}
 	redditAuth := RedditAuth{}
 	body, err := ioutil.ReadAll(res.Body)
-	// log.Printf("BODY: \n %s", string(body[:]))
 	err = json.Unmarshal(body, &redditAuth)
 	return redditAuth
 }
@@ -334,8 +337,6 @@ func channelHistory(w http.ResponseWriter, r *http.Request) {
 	err = Mongo.Messages.Find(
 		bson.M{"chatRoomId": room.Id}).Sort(
 		"-timestamp").Limit(150).All(&messageSlice)
-	// log.Printf("Messages in the channel: %d \n", len(messageSlice))
-	// get json
 	js, err := json.Marshal(messageSlice)
 	if err != nil {
 		panic(err)
@@ -349,24 +350,100 @@ func channelHistory(w http.ResponseWriter, r *http.Request) {
 	w.Write(js)
 }
 
+/**
+ * Channel to save messages to the database
+ */
+func saveMessages(m *chan []byte) {
+	for {
+		message, ok := <-*m
+		if !ok {
+			log.Println("Error when trying to save")
+			return
+		}
+		saveMessage(&message)
+	}
+}
+
+func saveMessage(msg *[]byte) {
+	message := Message{}
+	err := json.Unmarshal(*msg, &message)
+	message.MessageId = bson.NewObjectId()
+	message.Timestamp = time.Now()
+	var room Chatroom
+	// find the chatroom at this request
+	err = Mongo.Chatrooms.Find(bson.M{"name": message.ChatRoomName}).One(&room)
+	if err != nil { // channel not found
+		// create new channel
+		room.Name = message.ChatRoomName
+		room.Level = "0"
+		room.Active = "true"
+		room.Id = bson.NewObjectId()
+		err := Mongo.Chatrooms.Insert(room)
+		if err != nil {
+			log.Println(err)
+		} else {
+			room.Messages = append(room.Messages, message.MessageId)
+		}
+	}
+	// construct the new message
+	message.ChatRoomId = room.Id
+	// insert the message into the messages collection, with this chatroom
+	// and the user id
+	err = Mongo.Messages.Insert(message)
+	if err != nil {
+		log.Println(err)
+		// panic(err) // error inserting
+	}
+	var messageSlice []Message
+	var bsonMessageSlice []bson.ObjectId
+	// find all the messages that have this room as chatRoomId
+	err = Mongo.Messages.Find(
+		bson.M{"chatRoomId": room.Id}).Sort("-timestamp").All(&messageSlice)
+	if err != nil {
+		panic(err)
+	}
+	if len(messageSlice) > 0 {
+		if err != nil {
+			log.Println(err)
+		}
+		// if there is no messages it won't enter the loop
+		for i := 0; i < len(messageSlice); i++ {
+			bsonMessageSlice = append(bsonMessageSlice, messageSlice[i].MessageId)
+		}
+	}
+	// append the new message
+	bsonMessageSlice = append(bsonMessageSlice, message.MessageId)
+	// update the room with the new messsage
+	err = Mongo.Chatrooms.Update(bson.M{"_id": room.Id},
+		bson.M{"$set": bson.M{"messages": bsonMessageSlice}})
+	if err != nil {
+		panic(err)
+	}
+}
+
 func main() {
+	// env variables
+	CLIENT_ID = os.Getenv("APPID")
+	CLIENT_SECRET = os.Getenv("APPSECRET")
+	SERVER_ADDRESS = os.Getenv("GODDITADDR")
+	DOMAIN = os.Getenv("GODDITDOMAIN")
+	GPORT = os.Getenv("GPORT")
+	REDIRECT_URI = SERVER_ADDRESS + "/reddit_callback"
 	// connect to the database
 	session, err := mgo.Dial("127.0.0.1")
 	if err != nil {
 		panic(err)
 	}
 	session.SetMode(mgo.Monotonic, true)
-	m := session.DB("views").C("messages")
-	c := session.DB("views").C("chatrooms")
-	defer session.Close()
-	Mongo = newMongoDBConnections(session, m, c)
-	// gets the subreddits and stores them in the DB
+	Mongo = newMongoDBConnections(
+		session, session.DB("views").C("messages"),
+		session.DB("views").C("chatrooms"))
+	MessageChannel = make(chan []byte, 256)
+	// a goroutine for saving messages
+	go saveMessages(&MessageChannel)
 	go getPopularSubreddits()
-	// initialize the user slice
+	//for keeping track of users in memory
 	users = make(map[string]User)
-	CLIENT_ID = os.Getenv("APPID")
-	CLIENT_SECRET = os.Getenv("APPSECRET")
-	flag.Parse()
 	r := mux.NewRouter()
 	hub := newHub()
 	go hub.run()
@@ -379,11 +456,10 @@ func main() {
 			serveWs(hub, w, r)
 		})
 	srv := &http.Server{
-		Handler: r,
-		Addr:    ":9000",
-		// Enforcing timeouts
-		WriteTimeout: 15 * time.Second,
-		ReadTimeout:  15 * time.Second,
+		Handler:      r,
+		Addr:         ":" + GPORT,
+		WriteTimeout: 5 * time.Second,
+		ReadTimeout:  5 * time.Second,
 	}
 	err = srv.ListenAndServe()
 	if err != nil {
@@ -393,6 +469,7 @@ func main() {
 
 func getRandomString(n int) string {
 	b := make([]byte, n)
+	src := rand.NewSource(time.Now().UnixNano())
 	// A src.Int63() generates 63 random bits, enough for letterIdxMax characters!
 	for i, cache, remain := n-1, src.Int63(), letterIdxMax; i >= 0; {
 		if remain == 0 {
