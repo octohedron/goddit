@@ -86,7 +86,7 @@ var DOMAIN = "192.168.1.43"
 var GPORT = "9000"
 var REDIRECT_URI = SERVER_ADDRESS + "/reddit_callback"
 var SERVER_ADDRESS = "http://192.168.1.43:9000"
-var PROJ_ROOT = "/home/vagrant/go/src/github.com/octohedron/goddit"
+var PROJ_ROOT = "/home/ubuntu/go/src/github.com/octohedron/goddit"
 var COOKIE_NAME = "goddit"
 
 // mem
@@ -187,7 +187,7 @@ func redditCallback(w http.ResponseWriter, r *http.Request) {
 		Name:    COOKIE_NAME,
 		Value:   user.Name,
 		Path:    "/",
-		Domain:  "192.168.1.43",
+		Domain:  DOMAIN,
 	}
 	http.SetCookie(w, cookie)
 	http.Redirect(w, r, SERVER_ADDRESS+"/chat", 302)
@@ -432,6 +432,9 @@ func main() {
 	COOKIE_NAME = os.Getenv("GCOOKIE")
 	REDIRECT_URI = SERVER_ADDRESS + "/reddit_callback"
 	PROJ_ROOT, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	if err != nil {
+		log.Println(err)
+	}
 	// connect to the database
 	session, err := mgo.Dial("127.0.0.1")
 	if err != nil {

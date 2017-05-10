@@ -21,6 +21,10 @@ $ go build
 # from reddit.com/prefs/apps
 $ export APPID=YOUR_APP_ID
 $ export APPSECRET=YOUR_APP_SECRET
+$ export GODDITADDR=YOUR_SERVER_ADDR # i.e. http://localhost:9000
+$ export GODDITDOMAIN=YOUR_CHOSEN_DOMAIN # i.e. localhost / goddit.pro
+$ export GPORT=YOUR_PORT # 9000 / 80 
+$ export GCOOKIE=YOUR_CHOSEN_COOKIE_NAME # i.e. goddit
 ```
 + Run it
 ```Bash
