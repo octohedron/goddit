@@ -5,15 +5,15 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"github.com/elgs/gojq"
+	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/mux"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 	"html/template"
 	"io/ioutil"
 	"log"
 	"math/rand"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -37,32 +37,26 @@ type User struct {
 	Is_mod           bool    `json:"is_mod"`
 	Link_karma       int     `json:"link_karma"`
 	Over_18          bool    `json:"over_18"`
-	Name             string  `bson:"name" json:"name"`
-	Level            string  `bson:"level" json:"level"`
-	Active           string  `bson:"active" json:"active"`
-	Activation_token string  `bson:"activation_token" json:"activation_token"`
-	Created_at       string  `bson:"created_at" json:"created_at"`
+	Name             string  `json:"name"`
+	Level            string  `json:"level"`
+	Active           string  `json:"active"`
+	Activation_token string  `json:"activation_token"`
+	Created_at       string  `json:"created_at"`
 	Auth             RedditAuth
 	IP               string
 }
 
-type Chatroom struct {
-	Id        bson.ObjectId   `bson:"_id,omitempty" json:"_id,omitempty" inline`
-	Name      string          `bson:"name" json:"name"`
-	Level     string          `bson:"level" json:"level"`
-	Active    string          `bson:"active" json:"active"`
-	Timestamp time.Time       `bson:"timestamp,omitempty" json:"timestamp,omitempty"`
-	Messages  []bson.ObjectId `bson:"messages,omitempty" json:"messages" inline`
+type Message struct {
+	Level        int       `json:"level"`
+	Text         string    `json:"text"`
+	UserName     string    `json:"name"`
+	ChatRoomName string    `json:"room_name"`
+	Timestamp    time.Time `json:"timestamp,omitempty"`
 }
 
-type Message struct {
-	MessageId    bson.ObjectId `bson:"_id,omitempty" json:"_id,omitempty" inline`
-	Level        int           `bson:"level" json:"level"`
-	Text         string        `bson:"text" json:"text"`
-	UserName     string        `bson:"name" json:"name"`
-	ChatRoomName string        `bson:"room_name" json:"room_name"`
-	ChatRoomId   bson.ObjectId `bson:"chatRoomId,omitempty" json:"chatRoomId,omitempty"`
-	Timestamp    time.Time     `bson:"timestamp,omitempty" json:"timestamp,omitempty"`
+type DBMessage struct {
+	Room string
+	Json []byte
 }
 
 type RedditAuth struct {
@@ -70,12 +64,6 @@ type RedditAuth struct {
 	Token_type   string `json:"token_type"`
 	Expires_in   int    `json:"expires_in"`
 	Scope        string `json:"scope"`
-}
-
-type MongoDBConnections struct {
-	Session   *mgo.Session
-	Messages  *mgo.Collection
-	Chatrooms *mgo.Collection
 }
 
 // env
@@ -91,20 +79,35 @@ var PROJ_ROOT = ""
 // mem
 var users map[string]User
 var AuthorizedIps []string
-var Mongo *MongoDBConnections
-var MessageChannel chan []byte
+var MessageChannel chan DBMessage
 
-func newMongoDBConnections() *MongoDBConnections {
-	// connect to the database
-	session, err := mgo.Dial("127.0.0.1")
+// Declare a global variable to store the Redis connection pool.
+var POOL *redis.Pool
+
+func init() {
+	// env variables
+	CLIENT_ID = os.Getenv("APPID")
+	CLIENT_SECRET = os.Getenv("APPSECRET")
+	SERVER_ADDRESS = os.Getenv("GODDITADDR")
+	DOMAIN = os.Getenv("GODDITDOMAIN")
+	GPORT = os.Getenv("GPORT")
+	COOKIE_NAME = os.Getenv("GCOOKIE")
+	REDIRECT_URI = SERVER_ADDRESS + "/reddit_callback"
+	// set root directory
+	ROOT, err := os.Getwd()
 	if err != nil {
-		panic(err)
+		log.Println(err)
 	}
-	session.SetMode(mgo.Monotonic, true)
-	return &MongoDBConnections{
-		Session:   session,
-		Messages:  session.DB("views").C("messages"),
-		Chatrooms: session.DB("views").C("chatrooms"),
+	PROJ_ROOT = ROOT
+	// Establish a pool of 5 Redis connections to the Redis server
+	POOL = newPool("localhost:6379")
+}
+
+func newPool(addr string) *redis.Pool {
+	return &redis.Pool{
+		MaxIdle:     5,
+		IdleTimeout: 240 * time.Second,
+		Dial:        func() (redis.Conn, error) { return redis.Dial("tcp", addr) },
 	}
 }
 
@@ -119,12 +122,13 @@ func chat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", 405)
 		return
 	}
-	var Rooms []Chatroom
-	err := Mongo.Chatrooms.Find(nil).All(&Rooms)
+	conn := POOL.Get()
+	defer conn.Close()
+	Rooms, err := redis.Strings(conn.Do("SMEMBERS", "rooms"))
 	if err != nil {
 		log.Println(err)
-		panic(err) // didn't find any rooms, something wrong with the DB
 	}
+	sort.Strings(Rooms)
 	cookie, err := r.Cookie(COOKIE_NAME)
 	/**
 	 * Cookie not found or user not logged in
@@ -140,8 +144,40 @@ func chat(w http.ResponseWriter, r *http.Request) {
 			CookieName string
 			ServerAddr string
 			Username   string
-			Chatrooms  []Chatroom
+			Chatrooms  []string
 		}{COOKIE_NAME, SERVER_ADDRESS, users[cookie.Value].Name, Rooms})
+	}
+}
+
+func getPopularSubreddits() {
+	client := &http.Client{}
+	req, err := http.NewRequest("GET",
+		"https://www.reddit.com/subreddits/popular/.json", nil)
+	if err != nil {
+		log.Println(err)
+	}
+	req.Header.Set("User-agent",
+		"Web 1x83QLDFHequ8w 1.9.3 (by /u/SEND_ME_RARE_PEPES)")
+	res, err := client.Do(req)
+	if err != nil {
+		log.Println(err)
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	parser, err := gojq.NewStringQuery(string(body[:]))
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	conn := POOL.Get()
+	defer conn.Close()
+	for i := 0; i < 25; i++ {
+		name, err := parser.Query("data.children.[" +
+			strconv.Itoa(i) + "].data.display_name")
+		// add subreddit as room to redis
+		_, err = conn.Do("SADD", "rooms", name)
+		if err != nil {
+			log.Println(err)
+		}
 	}
 }
 
@@ -219,58 +255,6 @@ func getRedditUserData(auth RedditAuth) *User {
 	return &user
 }
 
-func getPopularSubreddits() {
-	client := &http.Client{}
-	req, err := http.NewRequest("GET",
-		"https://www.reddit.com/subreddits/popular/.json", nil)
-	if err != nil {
-		log.Println(err)
-	}
-	req.Header.Set("User-agent",
-		"Web 1x83QLDFHequ8w 1.9.3 (by /u/SEND_ME_RARE_PEPES)")
-	res, err := client.Do(req)
-	if err != nil {
-		log.Println(err)
-	}
-	body, err := ioutil.ReadAll(res.Body)
-	parser, err := gojq.NewStringQuery(string(body[:]))
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	bulkT := Mongo.Chatrooms.Bulk()
-	bulkT.Unordered() // Avoid dupes (?)
-	// Index
-	index := mgo.Index{
-		Key:        []string{"name"},
-		Unique:     true,
-		DropDups:   true,
-		Background: true,
-		Sparse:     true,
-	}
-	err = Mongo.Chatrooms.EnsureIndex(index)
-	for i := 0; i < 25; i++ {
-		name, err := parser.Query("data.children.[" +
-			strconv.Itoa(i) + "].data.display_name")
-		if err != nil {
-			log.Println(err)
-		}
-		subreddit := Chatroom{
-			Id:        bson.NewObjectId(),
-			Name:      name.(string),
-			Level:     "0",
-			Active:    "1",
-			Timestamp: time.Now(),
-		}
-		bulkT.Insert(subreddit)
-	}
-	_, err = bulkT.Run()
-	if err != nil {
-		log.Println("Found duplicate subreddits...")
-	}
-}
-
 func getRedditAuth(code string) RedditAuth {
 	client := &http.Client{}
 	req, err := http.NewRequest("POST",
@@ -297,68 +281,30 @@ func getRedditAuth(code string) RedditAuth {
  * Load the previous messages from this channel from the database
  */
 func channelHistory(w http.ResponseWriter, r *http.Request) {
+	var err error
 	vars := mux.Vars(r)
 	name := r.Header.Get("name")
 	if name == "" || users[name].Name == "" {
 		http.Error(w, "Forbidden", 403)
 		return
 	}
-	var room Chatroom
-	// find the chatroom at this request
-	err := Mongo.Chatrooms.Find(bson.M{"name": vars["channel"]}).One(&room)
-	if err != nil { // channel not found
-		log.Printf("Creating new channel: %s ...", vars["channel"])
-		// create new channel
-		room.Id = bson.NewObjectId()
-		room.Name = vars["channel"]
-		room.Level = "0"
-		room.Active = "true"
-		err := Mongo.Chatrooms.Insert(room)
-		if err != nil {
-			log.Println(err)
-		} else {
-			// new welcome message for the room
-			welcomeMessage := Message{
-				MessageId:    bson.NewObjectId(),
-				Text:         "Welcome to the new " + vars["channel"] + " chat",
-				ChatRoomName: vars["channel"],
-				UserName:     "Moderator",
-				ChatRoomId:   room.Id,
-				Timestamp:    time.Now(),
-				Level:        1, // level = power
-			}
-			room.Messages = append(room.Messages, welcomeMessage.MessageId)
-			// insert the new welcome message into the messages
-			// collection, with this chatroom id and the user id
-			err = Mongo.Messages.Insert(welcomeMessage)
-			if err != nil {
-				panic(err) // error inserting
-			}
-		}
-	}
-	// initialize a slice of size messageAmount to store the messages
-	var messageSlice []Message
-	// find the last 150 messages in the room
-	err = Mongo.Messages.Find(
-		bson.M{"chatRoomId": room.Id}).Sort(
-		"-timestamp").Limit(150).All(&messageSlice)
-	js, err := json.Marshal(messageSlice)
+	// Fetch a single Redis connection from the pool.
+	conn := POOL.Get()
+	defer conn.Close()
+	// first get list size
+	llength, err := redis.Int(conn.Do("LLEN", vars["channel"]))
+	result, err := redis.Strings(conn.Do("LRANGE", vars["channel"], llength-150, llength))
 	if err != nil {
-		panic(err)
-	}
-	// serve
-	if r.Method != "GET" {
-		http.Error(w, "Method not allowed", 405)
-		return
+		log.Println(err)
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(js)
+	w.Write([]byte("[" + strings.Join(result[:], ",") + "]"))
 }
 
 /**
  * Channel to save messages to the database
  */
-func saveMessages(m *chan []byte) {
+func saveMessages(m *chan DBMessage) {
 	for {
 		message, ok := <-*m
 		if !ok {
@@ -369,86 +315,23 @@ func saveMessages(m *chan []byte) {
 	}
 }
 
-func saveMessage(msg *[]byte) {
-	message := Message{}
-	err := json.Unmarshal(*msg, &message)
-	message.MessageId = bson.NewObjectId()
-	message.Timestamp = time.Now()
-	var room Chatroom
-	// find the chatroom at this request
-	err = Mongo.Chatrooms.Find(bson.M{"name": message.ChatRoomName}).One(&room)
-	if err != nil { // channel not found
-		// create new channel
-		room.Name = message.ChatRoomName
-		room.Level = "0"
-		room.Active = "true"
-		room.Id = bson.NewObjectId()
-		err := Mongo.Chatrooms.Insert(room)
-		if err != nil {
-			log.Println(err)
-		} else {
-			room.Messages = append(room.Messages, message.MessageId)
-		}
-	}
-	// construct the new message
-	message.ChatRoomId = room.Id
-	// insert the message into the messages collection, with this chatroom
-	// and the user id
-	err = Mongo.Messages.Insert(message)
-	if err != nil {
-		log.Println(err)
-		// panic(err) // error inserting
-	}
-	var messageSlice []Message
-	var bsonMessageSlice []bson.ObjectId
-	// find all the messages that have this room as chatRoomId
-	err = Mongo.Messages.Find(
-		bson.M{"chatRoomId": room.Id}).Sort("-timestamp").All(&messageSlice)
-	if err != nil {
-		panic(err)
-	}
-	if len(messageSlice) > 0 {
-		if err != nil {
-			log.Println(err)
-		}
-		// if there is no messages it won't enter the loop
-		for i := 0; i < len(messageSlice); i++ {
-			bsonMessageSlice = append(bsonMessageSlice, messageSlice[i].MessageId)
-		}
-	}
-	// append the new message
-	bsonMessageSlice = append(bsonMessageSlice, message.MessageId)
-	// update the room with the new messsage
-	err = Mongo.Chatrooms.Update(bson.M{"_id": room.Id},
-		bson.M{"$set": bson.M{"messages": bsonMessageSlice}})
-	if err != nil {
-		panic(err)
-	}
-}
-
-func init() {
-	ROOT, err := os.Getwd()
+func saveMessage(msg *DBMessage) {
+	var err error
+	conn := POOL.Get()
 	if err != nil {
 		log.Println(err)
 	}
-	PROJ_ROOT = ROOT
+	defer conn.Close()
+	_, err = conn.Do("RPUSH", msg.Room, msg.Json)
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func main() {
-	// env variables
-	CLIENT_ID = os.Getenv("APPID")
-	CLIENT_SECRET = os.Getenv("APPSECRET")
-	SERVER_ADDRESS = os.Getenv("GODDITADDR")
-	DOMAIN = os.Getenv("GODDITDOMAIN")
-	GPORT = os.Getenv("GPORT")
-	COOKIE_NAME = os.Getenv("GCOOKIE")
-	REDIRECT_URI = SERVER_ADDRESS + "/reddit_callback"
-	// set database
-	Mongo = newMongoDBConnections()
-	MessageChannel = make(chan []byte, 256)
+	MessageChannel = make(chan DBMessage, 256)
 	// a goroutine for saving messages
 	go saveMessages(&MessageChannel)
-	// crawl popular subreddits
 	go getPopularSubreddits()
 	//for keeping track of users in memory
 	users = make(map[string]User)

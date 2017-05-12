@@ -6,7 +6,6 @@ import (
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
-	// "strings"
 	"time"
 )
 
@@ -49,7 +48,7 @@ type Client struct {
 	send chan []byte
 
 	// a reference to the save channel
-	save *chan []byte
+	save *chan DBMessage
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -78,8 +77,12 @@ func (c *Client) readPump() {
 			panic(err)
 		}
 		c.hub.broadcast <- message
+		m := &DBMessage{
+			Room: c.room,
+			Json: message,
+		}
 		// send message to the save channel
-		*c.save <- message
+		*c.save <- *m
 	}
 }
 
@@ -131,6 +134,7 @@ func (c *Client) writePump() {
 func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	cookie, err := r.Cookie(COOKIE_NAME)
+	// if no cookie or user not in session, don't upgrade his websocket request
 	if err != nil || users[cookie.Value].Name == "" {
 		log.Println("Bogus request")
 		http.Error(w, "Not authorized", 403)
