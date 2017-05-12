@@ -3,6 +3,8 @@
 
 ============================
 
+Note: For the `MongoDB` / `mgo` implementation, check out the reddit branch
+
 ##### Try it out!
 
 + Install redis
