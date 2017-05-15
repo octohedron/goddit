@@ -54,7 +54,6 @@
 					response.json().then(function(json) {
 						if (json) {
 							for (var i = 0; i < json.length; i++) {
-								var item = document.createElement("li");
 								var message = json[i];
 								printMessage(message);
 							}
