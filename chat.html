@@ -34,7 +34,7 @@
 			var nick = document.getElementById("nick");
 			var log = document.getElementById("log");
 			var select = document.getElementById("room");
-			var currentRoom = 'AskReddit';
+			var currentRoom = $(".media-list a").first().text();;
 			var serverAddress = "{{ .ServerAddr }}";
 			
 			function loadHistory(room) {
@@ -54,9 +54,8 @@
 					response.json().then(function(json) {
 						if (json) {
 							for (var i = 0; i < json.length; i++) {
-								var item = document.createElement("li");
 								var message = json[i];
-								printMessage(message, true);
+								printMessage(message);
 							}
 						}
 					});
@@ -77,7 +76,7 @@
 			document.addEventListener('focusout', function(e) {
 					document.querySelector("#msg").scrollIntoView(true);
 			});
-			function printMessage(message, isHistory) {
+			function printMessage(message) {
 				var item = document.createElement("li");
 				if (message.name === "Moderator") {
 					message.color = "512DA8";
@@ -93,26 +92,22 @@
 				const Item = ({
 					name, text, color
 				}) => `
-						<div class="media-body">
-							<div class="media">
-								<a class="pull-left" href="#">
-									<img class="media-object img-circle " src="http://placeskull.com/40/40/${color}">
-								</a>
-								<div class="media-body">
-									${text}
-									<br>
-									<small class="text-muted">${name}</small>
-									<hr>
-								</div>
+					<div class="media-body">
+						<div class="media">
+							<a class="pull-left" href="#">
+								<img class="media-object img-circle " src="http://placeskull.com/40/40/${color}">
+							</a>
+							<div class="media-body">
+								${text}
+								<br>
+								<small class="text-muted">${name}</small>
+								<hr>
 							</div>
-						</div>`;
+						</div>
+					</div>`;
 				$(item).html([message].map(Item).join(''));
-				if (isHistory) {
-					appendLog(item);
-				} else {
-					log.appendChild(item);
-					item.scrollIntoView(true);
-				}
+				log.appendChild(item);
+				item.scrollIntoView(true);
 			}
 			loadHistory(currentRoom);
 			connectWs(currentRoom);
@@ -177,7 +172,7 @@
 					conn.onmessage = function(evt) {
 						var message = JSON.parse(evt.data);
 						// console.log(message);
-						printMessage(message, false);
+						printMessage(message);
 					};
 				} else {
 					var item = document.createElement("li");
@@ -335,7 +330,7 @@
 					<!-- SUBREDDITS -->
 					<div class="media-list" id="rooms">
 						{{range $i, $a := .Chatrooms}}
-							<a href="#" class="list-group-item">{{ .Name }}</a> 
+							<a href="#" class="list-group-item">{{ . }}</a> 
 						{{end}}
 					</div>
 					<!-- END SUBREDDITS -->
@@ -344,7 +339,7 @@
 			<div class="col-lg-10 col-md-10 col-xs-12 current-chat">
 				<div class="row chat-toolbar-row">
 					<div class="col-sm-12 col-xs-12 ">
-						<div class="btn-group chat-toolbar" role="group" aria-label="...">
+						<div class="btn-group chat-toolbar" role="group">
 							<a href="#" id="chat-leave" class="btn btn-default ticket-option" 
 								type="button">
 								<i class="glyphicon glyphicon-remove-sign"></i> Leave Chat </a>
@@ -377,12 +372,12 @@
 		</div>
 	</div>
 
-	<div class="modal fade" tabindex="-1" role="dialog" id="subreddits-modal" aria-labelledby="mySmallModalLabel">
+	<div class="modal fade" tabindex="-1" role="dialog" id="subreddits-modal">
 	  <div class="modal-dialog modal-sm" role="document">
 	    <div class="modal-content">
 	      <div class="media-list" id="rooms-mobile">
 						{{range $i, $a := .Chatrooms}}
-							<a href="#" class="list-group-item">{{ .Name }}</a> 
+							<a href="#" class="list-group-item">{{ . }}</a> 
 						{{end}}
 					</div>
 	    </div>
