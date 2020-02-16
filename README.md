@@ -37,6 +37,12 @@ MONGO_ADDR=YOUR_MONGO_ADDR # i.e. 127.0.0.1, 172.17.0.1 for docker, etc
 $ nohup ./goddit &
 ```
 
+- Run it with Docker
+
+```bash
+docker rm goddit && docker build -t goddit . && docker run --name goddit -p 9000:9000 -it goddit
+```
+
 ## Features
 
 - Crawls popular subreddits (first 25) and adds them as chatrooms in a separate `goroutine` (for faster startup) when you start the program
