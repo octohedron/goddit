@@ -4,10 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"github.com/elgs/gojq"
-	"github.com/gorilla/mux"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 	"html/template"
 	"io/ioutil"
 	"log"
@@ -17,6 +13,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/joho/godotenv"
+
+	"github.com/elgs/gojq"
+	"github.com/gorilla/mux"
+	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 )
 
 const (
@@ -87,6 +90,7 @@ var REDIRECT_URI = SERVER_ADDRESS + "/reddit_callback"
 var SERVER_ADDRESS = "http://192.168.1.43:9000"
 var COOKIE_NAME = "goddit"
 var PROJ_ROOT = ""
+var MONGO_ADDR = "YOUR_MONGO_ADDR"
 
 // mem
 var users map[string]User
@@ -96,7 +100,7 @@ var MessageChannel chan []byte
 
 func newMongoDBConnections() *MongoDBConnections {
 	// connect to the database
-	session, err := mgo.Dial("127.0.0.1")
+	session, err := mgo.Dial(MONGO_ADDR)
 	if err != nil {
 		panic(err)
 	}
@@ -230,9 +234,12 @@ func getPopularSubreddits() {
 		"Web 1x83QLDFHequ8w 1.9.3 (by /u/SEND_ME_RARE_PEPES)")
 	res, err := client.Do(req)
 	if err != nil {
-		log.Println(err)
+		log.Println("ERROR DOING REQUEST", err)
 	}
 	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Println("ERROR READING BODY", err)
+	}
 	parser, err := gojq.NewStringQuery(string(body[:]))
 	if err != nil {
 		log.Println(err)
@@ -427,6 +434,19 @@ func saveMessage(msg *[]byte) {
 }
 
 func init() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+	// env variables
+	CLIENT_ID = os.Getenv("APPID")
+	CLIENT_SECRET = os.Getenv("APPSECRET")
+	SERVER_ADDRESS = os.Getenv("GODDITADDR")
+	DOMAIN = os.Getenv("GODDITDOMAIN")
+	GPORT = os.Getenv("GPORT")
+	COOKIE_NAME = os.Getenv("GCOOKIE")
+	MONGO_ADDR = os.Getenv("MONGO_ADDR")
+	log.Println("ENVIRONMENT", CLIENT_ID, CLIENT_SECRET, SERVER_ADDRESS, DOMAIN, GPORT, COOKIE_NAME, MONGO_ADDR)
 	ROOT, err := os.Getwd()
 	if err != nil {
 		log.Println(err)
@@ -435,13 +455,6 @@ func init() {
 }
 
 func main() {
-	// env variables
-	CLIENT_ID = os.Getenv("APPID")
-	CLIENT_SECRET = os.Getenv("APPSECRET")
-	SERVER_ADDRESS = os.Getenv("GODDITADDR")
-	DOMAIN = os.Getenv("GODDITDOMAIN")
-	GPORT = os.Getenv("GPORT")
-	COOKIE_NAME = os.Getenv("GCOOKIE")
 	REDIRECT_URI = SERVER_ADDRESS + "/reddit_callback"
 	// set database
 	Mongo = newMongoDBConnections()
@@ -470,6 +483,7 @@ func main() {
 		WriteTimeout: 5 * time.Second,
 		ReadTimeout:  5 * time.Second,
 	}
+	log.Println("Serving in port", GPORT)
 	err := srv.ListenAndServe()
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
