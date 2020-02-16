@@ -8,31 +8,32 @@
 - Clone repo to `$GOPATH/src/github.com/octohedron/goddit`
 - Install dependencies
 
-```Bash
+```bash
 $ go get
 ```
 
 - Build the binary
 
-```Bash
+```bash
 $ go build
 ```
 
-- Set environment variables
+- Edit the [.env](./.env) file in the root of the repository with your values
 
-```Bash
+```bash
 # from reddit.com/prefs/apps
-$ export APPID=YOUR_APP_ID
-$ export APPSECRET=YOUR_APP_SECRET
-$ export GODDITADDR=YOUR_SERVER_ADDR # i.e. http://localhost:9000
-$ export GODDITDOMAIN=YOUR_CHOSEN_DOMAIN # i.e. localhost / goddit.pro
-$ export GPORT=YOUR_PORT # 9000 / 80
-$ export GCOOKIE=YOUR_CHOSEN_COOKIE_NAME # i.e. goddit
+APPID=YOUR_APP_ID
+APPSECRET=YOUR_APP_SECRET
+GODDITADDR=YOUR_SERVER_ADDR # i.e. http://localhost:9000
+GODDITDOMAIN=YOUR_DOMAIN # i.e. localhost / goddit.pro
+GPORT=9000 # 9000 / 80
+GCOOKIE=YOUR_COOKIE # i.e. goddit
+MONGO_ADDR=YOUR_MONGO_ADDR # i.e. 127.0.0.1, 172.17.0.1 for docker, etc
 ```
 
-- Run it
+- Run it manually
 
-```Bash
+```bash
 $ nohup ./goddit &
 ```
 
