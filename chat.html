@@ -198,7 +198,7 @@
         function connectWs(room) {
           if (window["WebSocket"]) {
             conn = new WebSocket(
-              "ws://" + document.location.host + "/room/" + room
+              "wss://" + document.location.host + "/room/" + room
             );
             conn.onopen = function(evt) {
               var item = document.createElement("li");
