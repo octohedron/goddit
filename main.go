@@ -83,7 +83,7 @@ type MongoDBConnections struct {
 var CLIENT_ID = "YOUR_APP_ID"
 var CLIENT_SECRET = "YOUR_APP_SECRET"
 var DOMAIN = "192.168.1.43"
-var GPORT = "9000"
+var PORT = "9000"
 var REDIRECT_URI = SERVER_ADDRESS + "/reddit_callback"
 var SERVER_ADDRESS = "http://192.168.1.43:9000"
 var COOKIE_NAME = "goddit"
@@ -453,12 +453,12 @@ func init() {
 	CLIENT_SECRET = os.Getenv("APPSECRET")
 	SERVER_ADDRESS = os.Getenv("GODDITADDR")
 	DOMAIN = os.Getenv("GODDITDOMAIN")
-	GPORT = os.Getenv("GPORT")
+	PORT = os.Getenv("PORT")
 	COOKIE_NAME = os.Getenv("GCOOKIE")
 	MONGO_ADDR = os.Getenv("MONGO_ADDR")
 	MONGO_USER = os.Getenv("MONGO_USER")
 	MONGO_PASS = os.Getenv("MONGO_PASS")
-	log.Println("ENVIRONMENT", CLIENT_ID, CLIENT_SECRET, SERVER_ADDRESS, DOMAIN, GPORT, COOKIE_NAME, MONGO_ADDR)
+	log.Println("ENVIRONMENT", CLIENT_ID, CLIENT_SECRET, SERVER_ADDRESS, DOMAIN, PORT, COOKIE_NAME, MONGO_ADDR)
 	ROOT, err := os.Getwd()
 	if err != nil {
 		log.Println(err)
@@ -491,11 +491,11 @@ func main() {
 	r.PathPrefix("/").Handler(http.StripPrefix("/", http.FileServer(http.Dir(PROJ_ROOT+"/icons"))))
 	srv := &http.Server{
 		Handler:      r,
-		Addr:         ":" + GPORT,
+		Addr:         ":" + PORT,
 		WriteTimeout: 5 * time.Second,
 		ReadTimeout:  5 * time.Second,
 	}
-	log.Println("Serving in port", GPORT)
+	log.Println("Serving in port", PORT)
 	err := srv.ListenAndServe()
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
