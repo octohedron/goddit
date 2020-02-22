@@ -89,6 +89,8 @@ var SERVER_ADDRESS = "http://192.168.1.43:9000"
 var COOKIE_NAME = "goddit"
 var PROJ_ROOT = ""
 var MONGO_ADDR = "YOUR_MONGO_ADDR"
+var MONGO_USER = "YOUR_MONGO_USR"
+var MONGO_PASS = "YOUR_MONGO_PASS"
 
 // mem
 var users map[string]User
@@ -98,9 +100,15 @@ var MessageChannel chan []byte
 
 func newMongoDBConnections() *MongoDBConnections {
 	for {
-		log.Println(MONGO_ADDR)
 		// connect to the database
-		session, err := mgo.Dial(MONGO_ADDR)
+		mongoDBDialInfo := &mgo.DialInfo{
+			Addrs:    []string{MONGO_ADDR},
+			Timeout:  60 * time.Hour,
+			Database: "admin",
+			Username: MONGO_USER,
+			Password: MONGO_PASS,
+		}
+		session, err := mgo.DialWithInfo(mongoDBDialInfo)
 		if err == nil {
 			log.Println("CONNECTED TO MOngoDB")
 			session.SetMode(mgo.Monotonic, true)
@@ -109,10 +117,9 @@ func newMongoDBConnections() *MongoDBConnections {
 				Messages:  session.DB("views").C("messages"),
 				Chatrooms: session.DB("views").C("chatrooms"),
 			}
-		} else {
-			log.Println("Attempting MongoDB connection", err)
-			time.Sleep(1 * time.Second)
 		}
+		log.Println("Attempting MongoDB connection", err)
+		time.Sleep(1 * time.Second)
 	}
 }
 
@@ -449,6 +456,8 @@ func init() {
 	GPORT = os.Getenv("GPORT")
 	COOKIE_NAME = os.Getenv("GCOOKIE")
 	MONGO_ADDR = os.Getenv("MONGO_ADDR")
+	MONGO_USER = os.Getenv("MONGO_USER")
+	MONGO_PASS = os.Getenv("MONGO_PASS")
 	log.Println("ENVIRONMENT", CLIENT_ID, CLIENT_SECRET, SERVER_ADDRESS, DOMAIN, GPORT, COOKIE_NAME, MONGO_ADDR)
 	ROOT, err := os.Getwd()
 	if err != nil {

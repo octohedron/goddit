@@ -29,6 +29,8 @@ GODDITDOMAIN=YOUR_DOMAIN # i.e. localhost / goddit.pro
 GPORT=9000 # 9000 / 80
 GCOOKIE=YOUR_COOKIE # i.e. goddit
 MONGO_ADDR=YOUR_MONGO_ADDR # i.e. 127.0.0.1, 172.17.0.1 for docker, etc
+MONGO_USER=YOUR_MONGO_USER # i.e. username
+MONGO_PASS=YOUR_MONGO_PASS # i.e. hunter2
 ```
 
 - Run it manually
