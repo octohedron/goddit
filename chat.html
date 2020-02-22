@@ -393,7 +393,7 @@
             <!-- SUBREDDITS -->
             <div class="media-list" id="rooms">
               {{range .Chatrooms}}
-              <a href="#" class="list-group-item">/r/{{ .Name }}</a>
+              <a href="#" class="list-group-item">{{ .Name }}</a>
               {{end}}
             </div>
             <!-- END SUBREDDITS -->
@@ -462,7 +462,7 @@
         <div class="modal-content">
           <div class="media-list" id="rooms-mobile">
             {{range .Chatrooms}}
-            <a href="#" class="list-group-item">/r/{{ .Name }}</a>
+            <a href="#" class="list-group-item">{{ .Name }}</a>
             {{end}}
           </div>
         </div>
