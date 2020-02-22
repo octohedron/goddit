@@ -10,13 +10,11 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
 
-	"github.com/elgs/gojq"
 	"github.com/gorilla/mux"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -94,7 +92,7 @@ var MONGO_ADDR = "YOUR_MONGO_ADDR"
 
 // mem
 var users map[string]User
-var AuthorizedIps []string
+var authorizedIPs []string
 var Mongo *MongoDBConnections
 var MessageChannel chan []byte
 
@@ -189,7 +187,7 @@ func redditCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	clientIp := strings.Split(r.RemoteAddr, ":")[0]
-	AuthorizedIps = append(AuthorizedIps, clientIp)
+	authorizedIPs = append(authorizedIPs, clientIp)
 	user.Auth = authData
 	user.IP = clientIp
 	// store reddit auth data in the map, Username -> RedditAuth data
@@ -246,7 +244,8 @@ func getPopularSubreddits() {
 	if err != nil {
 		log.Println("ERROR READING BODY", err)
 	}
-	parser, err := gojq.NewStringQuery(string(body[:]))
+	var pS PopularSubreddits
+	err = json.Unmarshal(body, &pS)
 	if err != nil {
 		log.Println(err)
 		return
@@ -264,14 +263,12 @@ func getPopularSubreddits() {
 	}
 	err = Mongo.Chatrooms.EnsureIndex(index)
 	for i := 0; i < 25; i++ {
-		name, err := parser.Query("data.children.[" +
-			strconv.Itoa(i) + "].data.display_name")
 		if err != nil {
 			log.Println(err)
 		}
 		subreddit := Chatroom{
 			Id:        bson.NewObjectId(),
-			Name:      name.(string),
+			Name:      pS.Data.Children[i].Data.DisplayName,
 			Level:     "0",
 			Active:    "1",
 			Timestamp: time.Now(),

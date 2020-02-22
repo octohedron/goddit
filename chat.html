@@ -1,97 +1,131 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-	<meta charset="utf-8">
-	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
 
-	<link rel="apple-touch-icon" sizes="57x57" href="/apple-icon-57x57.png">
-	<link rel="apple-touch-icon" sizes="60x60" href="/apple-icon-60x60.png">
-	<link rel="apple-touch-icon" sizes="72x72" href="/apple-icon-72x72.png">
-	<link rel="apple-touch-icon" sizes="76x76" href="/apple-icon-76x76.png">
-	<link rel="apple-touch-icon" sizes="114x114" href="/apple-icon-114x114.png">
-	<link rel="apple-touch-icon" sizes="120x120" href="/apple-icon-120x120.png">
-	<link rel="apple-touch-icon" sizes="144x144" href="/apple-icon-144x144.png">
-	<link rel="apple-touch-icon" sizes="152x152" href="/apple-icon-152x152.png">
-	<link rel="apple-touch-icon" sizes="180x180" href="/apple-icon-180x180.png">
-	<link rel="icon" type="image/png" sizes="192x192"  href="/android-icon-192x192.png">
-	<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-	<link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png">
-	<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-	<link rel="manifest" href="/manifest.json">
-	<meta name="msapplication-TileColor" content="#ffffff">
-	<meta name="msapplication-TileImage" content="/ms-icon-144x144.png">
-	<meta name="theme-color" content="#ffffff">
+    <link rel="apple-touch-icon" sizes="57x57" href="/apple-icon-57x57.png" />
+    <link rel="apple-touch-icon" sizes="60x60" href="/apple-icon-60x60.png" />
+    <link rel="apple-touch-icon" sizes="72x72" href="/apple-icon-72x72.png" />
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-icon-76x76.png" />
+    <link
+      rel="apple-touch-icon"
+      sizes="114x114"
+      href="/apple-icon-114x114.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="120x120"
+      href="/apple-icon-120x120.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="144x144"
+      href="/apple-icon-144x144.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="152x152"
+      href="/apple-icon-152x152.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/apple-icon-180x180.png"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="192x192"
+      href="/android-icon-192x192.png"
+    />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="msapplication-TileColor" content="#ffffff" />
+    <meta name="msapplication-TileImage" content="/ms-icon-144x144.png" />
+    <meta name="theme-color" content="#ffffff" />
 
-	<meta name="description" content="Golang Reddit Chat">
-	<meta name="author" content="Gustavo Rodríguez">
+    <meta name="description" content="Golang Reddit Chat" />
+    <meta name="author" content="Gustavo Rodríguez" />
 
-	<script type="text/javascript">
-		window.onload = function() {
-			var conn;
-			var msg = document.getElementById("msg");
-			var nick = document.getElementById("nick");
-			var log = document.getElementById("log");
-			var select = document.getElementById("room");
-			var currentRoom = $(".media-list a").first().text();;
-			var serverAddress = "{{ .ServerAddr }}";
-			
-			function loadHistory(room) {
-				var authHeader = new Headers();
-				authHeader.append("name", "{{ .Username }}");
-				var request = { method: 'GET', headers: authHeader, cache: 'default' };
-				var historyRequest = 
-					new Request(serverAddress + "/history/" + room, request);
-				// clear the room messages first
-				while (log.hasChildNodes()) {
-					log.removeChild(log.lastChild);
-				}
-				fetch(historyRequest, {
-					method: 'get'
-				}).then(function(response) {
-					console.log('loaded the history of ' + room + ' room');
-					response.json().then(function(json) {
-						if (json) {
-							for (var i = 0; i < json.length; i++) {
-								var message = json[i];
-								printMessage(message);
-							}
-						}
-					});
-				}).catch(function(err) {
-					console.log(err);
-				});
-			}
+    <script type="text/javascript">
+      window.onload = function() {
+        var conn;
+        var msg = document.getElementById("msg");
+        var nick = document.getElementById("nick");
+        var log = document.getElementById("log");
+        var select = document.getElementById("room");
+        var currentRoom = $(".media-list a")
+          .first()
+          .text();
+        var serverAddress = "{{ .ServerAddr }}";
 
-			function appendLog(item) {
-				let firstChild = log.firstChild;
-				log.insertBefore(item, firstChild);
-				// scroll to last item
-				Array.from(document.querySelectorAll("#log li"))
-					.pop().scrollIntoView(true);
-				// scroll to bottom of the page, for mobile
-				document.querySelector("#msg").scrollIntoView(true);
-			}
-			document.addEventListener('focusout', function(e) {
-					document.querySelector("#msg").scrollIntoView(true);
-			});
-			function printMessage(message) {
-				var item = document.createElement("li");
-				if (message.name === "Moderator") {
-					message.color = "512DA8";
-				} else if (message.name === "Anonymous") {
-					message.color = "388E3C";
-				} else if (message.name === '{{.Username}}') {
-					message.color = "1565C0";
-				} else {
-					message.color = "FF3D00";
-				}
-				item.setAttribute("class", "media");
-				// template
-				const Item = ({
-					name, text, color
-				}) => `
+        function loadHistory(room) {
+          var authHeader = new Headers();
+          authHeader.append("name", "{{ .Username }}");
+          var request = {
+            method: "GET",
+            headers: authHeader,
+            cache: "default"
+          };
+          var historyRequest = new Request(
+            serverAddress + "/history/" + room,
+            request
+          );
+          // clear the room messages first
+          while (log.hasChildNodes()) {
+            log.removeChild(log.lastChild);
+          }
+          fetch(historyRequest, {
+            method: "get"
+          })
+            .then(function(response) {
+              console.log("loaded the history of " + room + " room");
+              response.json().then(function(json) {
+                if (json) {
+                  for (var i = 0; i < json.length; i++) {
+                    var message = json[i];
+                    printMessage(message);
+                  }
+                }
+              });
+            })
+            .catch(function(err) {
+              console.log(err);
+            });
+        }
+
+        function appendLog(item) {
+          let firstChild = log.firstChild;
+          log.insertBefore(item, firstChild);
+          // scroll to last item
+          Array.from(document.querySelectorAll("#log li"))
+            .pop()
+            .scrollIntoView(true);
+          // scroll to bottom of the page, for mobile
+          document.querySelector("#msg").scrollIntoView(true);
+        }
+        document.addEventListener("focusout", function(e) {
+          document.querySelector("#msg").scrollIntoView(true);
+        });
+        function printMessage(message) {
+          var item = document.createElement("li");
+          if (message.name === "Moderator") {
+            message.color = "512DA8";
+          } else if (message.name === "Anonymous") {
+            message.color = "388E3C";
+          } else if (message.name === "{{.Username}}") {
+            message.color = "1565C0";
+          } else {
+            message.color = "FF3D00";
+          }
+          item.setAttribute("class", "media");
+          // template
+          const Item = ({ name, text, color }) => `
 					<div class="media-body">
 						<div class="media">
 							<a class="pull-left" href="#">
@@ -105,301 +139,354 @@
 							</div>
 						</div>
 					</div>`;
-				$(item).html([message].map(Item).join(''));
-				log.appendChild(item);
-				item.scrollIntoView(true);
-			}
-			loadHistory(currentRoom);
-			connectWs(currentRoom);
-			document.getElementById("chat-leave").addEventListener("click", function(e) {
-				e.preventDefault();
-				//remove cookies at / and at /chat
-				var domain = location.hostname;
-				document.cookie = [
-					'{{ .CookieName }}=',
-					'; expires=' + new Date(0).toUTCString(),
-					'; path=/',
-					'; domain=' + domain
-				].join('');
-				document.cookie = [
-					'{{ .CookieName }}=',
-					'; expires=' + new Date(0).toUTCString(),
-					'; path=/chat',
-					'; domain=' + domain
-				].join('');
-				document.location = serverAddress;
-			});
-			document.getElementById("submit").addEventListener("click", function(e) {
-				e.preventDefault();
-				if (!conn) {
-					console.log('no Connection');
-					return false;
-				}
-				if (!msg.value) {
-					console.log('no Value');
-					return false;
-				}
-				sendMessage();
-				return false;
-			}, false);
-			// make a new websocket connection when switching rooms
-			function sendMessage() {
-				var json = {
-					_id: '',
-					text: msg.value,
-					name: "{{ .Username }}",
-					room_name: currentRoom,
-					chatRoomId: '',
-					level: 1
-				};
-				conn.send(JSON.stringify(json));
-				msg.value = "";
-			}
-			function connectWs(room) {
-				if (window["WebSocket"]) {
-					conn = new WebSocket("ws://" +
-						document.location.host + "/room/" + room);
-					conn.onopen = function(evt) {
-						var item = document.createElement("li");
-						item.innerHTML = "<em>Connected to " + room + "</em>";
-						log.appendChild(item);
-					}
-					conn.onclose = function(evt) {
-						var item = document.createElement("li");
-						item.innerHTML = "<em>Connection to " + room + " closed</em>";
-						log.appendChild(item);
-					};
-					conn.onmessage = function(evt) {
-						var message = JSON.parse(evt.data);
-						// console.log(message);
-						printMessage(message);
-					};
-				} else {
-					var item = document.createElement("li");
-					item.innerHTML = "<b>Your browser does not support WebSockets.</b>";
-					log.appendChild(item);
-				}
-			}
-			document.getElementById("rooms").addEventListener("click", function(e) {
-				if (e.target && e.target.nodeName == "A") {
-					e.preventDefault();
-					conn.close();
-					connectWs(e.target.text);
-					loadHistory(e.target.text);
-					currentRoom = e.target.text;
-				}
-			}, false);
-			document.getElementById("rooms-mobile").addEventListener("click", function(e) {
-				if (e.target && e.target.nodeName == "A") {
-					e.preventDefault();
-					conn.close();
-					connectWs(e.target.text);
-					loadHistory(e.target.text);
-					currentRoom = e.target.text;
-					$("#subreddits-modal").modal('hide');
-				}
-			}, false);
+          $(item).html([message].map(Item).join(""));
+          log.appendChild(item);
+          item.scrollIntoView(true);
+        }
+        loadHistory(currentRoom);
+        connectWs(currentRoom);
+        document
+          .getElementById("chat-leave")
+          .addEventListener("click", function(e) {
+            e.preventDefault();
+            //remove cookies at / and at /chat
+            var domain = location.hostname;
+            document.cookie = [
+              "{{ .CookieName }}=",
+              "; expires=" + new Date(0).toUTCString(),
+              "; path=/",
+              "; domain=" + domain
+            ].join("");
+            document.cookie = [
+              "{{ .CookieName }}=",
+              "; expires=" + new Date(0).toUTCString(),
+              "; path=/chat",
+              "; domain=" + domain
+            ].join("");
+            document.location = serverAddress;
+          });
+        document.getElementById("submit").addEventListener(
+          "click",
+          function(e) {
+            e.preventDefault();
+            if (!conn) {
+              console.log("no Connection");
+              return false;
+            }
+            if (!msg.value) {
+              console.log("no Value");
+              return false;
+            }
+            sendMessage();
+            return false;
+          },
+          false
+        );
+        // make a new websocket connection when switching rooms
+        function sendMessage() {
+          var json = {
+            _id: "",
+            text: msg.value,
+            name: "{{ .Username }}",
+            room_name: currentRoom,
+            chatRoomId: "",
+            level: 1
+          };
+          conn.send(JSON.stringify(json));
+          msg.value = "";
+        }
+        function connectWs(room) {
+          if (window["WebSocket"]) {
+            conn = new WebSocket(
+              "ws://" + document.location.host + "/room/" + room
+            );
+            conn.onopen = function(evt) {
+              var item = document.createElement("li");
+              item.innerHTML = "<em>Connected to " + room + "</em>";
+              log.appendChild(item);
+            };
+            conn.onclose = function(evt) {
+              var item = document.createElement("li");
+              item.innerHTML = "<em>Connection to " + room + " closed</em>";
+              log.appendChild(item);
+            };
+            conn.onmessage = function(evt) {
+              var message = JSON.parse(evt.data);
+              // console.log(message);
+              printMessage(message);
+            };
+          } else {
+            var item = document.createElement("li");
+            item.innerHTML = "<b>Your browser does not support WebSockets.</b>";
+            log.appendChild(item);
+          }
+        }
+        document.getElementById("rooms").addEventListener(
+          "click",
+          function(e) {
+            if (e.target && e.target.nodeName == "A") {
+              e.preventDefault();
+              conn.close();
+              connectWs(e.target.text);
+              loadHistory(e.target.text);
+              currentRoom = e.target.text;
+            }
+          },
+          false
+        );
+        document.getElementById("rooms-mobile").addEventListener(
+          "click",
+          function(e) {
+            if (e.target && e.target.nodeName == "A") {
+              e.preventDefault();
+              conn.close();
+              connectWs(e.target.text);
+              loadHistory(e.target.text);
+              currentRoom = e.target.text;
+              $("#subreddits-modal").modal("hide");
+            }
+          },
+          false
+        );
 
-			$('#msg').on('keydown', function(e) {
-				if (e.keyCode === 13) { // pressed enter
-					e.preventDefault();
-					if (!conn) {
-						console.log('no Connection');
-						return false;
-					}
-					if (!msg.value) {
-						console.log('no Value');
-						return false;
-					}
-					sendMessage();
-					return false;
-				}
-			});
-			$(".media-list a").on("click", function() {
-				$(".media-list a").removeClass("active");
-				$(this).addClass("active");
-			});
-			$(".media-list a").on("click", function() {
-				$(".media-list a").removeClass("active");
-				$(this).addClass("active");
-			});
-			// add active to first chat channel when loading the page
-			$(".media-list a").first().addClass("active");
-		}</script>
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js" crossorigin="anonymous"></script>
-	<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
-	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
-	<style type="text/css">
-		#twitter-widget-0{ 
-			float:right !important; 
-		}
-		.blue {
-			background: blue
-		}
-		.grey {
-			background: grey
-		}
-		.chats-row {
-			height: 100vh;
-		}
-		.chats-row div {
-			height: 50%;
-			border: 1px solid #ddd;
-			padding: 0px;
-		}
-		.list-group-item {
-			border: none;
-			border-top: 1px solid #ddd;
-			border-bottom: 1px solid #ddd;
-		}
-		.list-group-item:first-child {
-			border-top: none;
-			border-top-left-radius: 0px;
-			border-top-right-radius: 0px;
-		}
-		.current-chat {
-			height: 100vh;
-			border: 1px solid #ddd;
-		}
-		.chat-toolbar-row {
-			background-color: #f5f5f5;
-		}
-		.chat-toolbar {
-			width: 100% !important;
-			margin-top: 10px;
-			margin-bottom: 10px;
-			text-align: center;
-		}
-		.btn-change-room{
-	    width: 110px;
-	    display: inline-block;
-  	  margin-right: auto;
-    	text-align: center;
-    	float: none;
+        $("#msg").on("keydown", function(e) {
+          if (e.keyCode === 13) {
+            // pressed enter
+            e.preventDefault();
+            if (!conn) {
+              console.log("no Connection");
+              return false;
+            }
+            if (!msg.value) {
+              console.log("no Value");
+              return false;
+            }
+            sendMessage();
+            return false;
+          }
+        });
+        $(".media-list a").on("click", function() {
+          $(".media-list a").removeClass("active");
+          $(this).addClass("active");
+        });
+        $(".media-list a").on("click", function() {
+          $(".media-list a").removeClass("active");
+          $(this).addClass("active");
+        });
+        // add active to first chat channel when loading the page
+        $(".media-list a")
+          .first()
+          .addClass("active");
+      };
+    </script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"
+      crossorigin="anonymous"
+    ></script>
+    <link
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u"
+      crossorigin="anonymous"
+    />
+    <script
+      src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+      integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa"
+      crossorigin="anonymous"
+    ></script>
+    <style type="text/css">
+      #twitter-widget-0 {
+        float: right !important;
+      }
+      .blue {
+        background: blue;
+      }
+      .grey {
+        background: grey;
+      }
+      .chats-row {
+        height: 100vh;
+      }
+      .chats-row div {
+        height: 50%;
+        border: 1px solid #ddd;
+        padding: 0px;
+      }
+      .list-group-item {
+        border: none;
+        border-top: 1px solid #ddd;
+        border-bottom: 1px solid #ddd;
+      }
+      .list-group-item:first-child {
+        border-top: none;
+        border-top-left-radius: 0px;
+        border-top-right-radius: 0px;
+      }
+      .current-chat {
+        height: 100vh;
+        border: 1px solid #ddd;
+      }
+      .chat-toolbar-row {
+        background-color: #f5f5f5;
+      }
+      .chat-toolbar {
+        width: 100% !important;
+        margin-top: 10px;
+        margin-bottom: 10px;
+        text-align: center;
+      }
+      .btn-change-room {
+        width: 110px;
+        display: inline-block;
+        margin-right: auto;
+        text-align: center;
+        float: none;
+      }
+      .current-chat-area {
+        padding-top: 10px;
+        overflow: auto;
+        height: 85vh;
+      }
+      .current-chat-footer {
+        position: absolute;
+        bottom: 0;
+        width: 100%;
+      }
+      @media screen and (max-width: 991px) {
+        .current-chat-footer {
+          position: relative;
+          bottom: 0;
+          width: 100vw;
+        }
+        .btn-change-room {
+          width: 110px;
+          display: inline-block !important;
+          margin-right: auto;
+          text-align: center;
+          float: none !important;
+        }
+        .chat-toolbar {
+          padding-top: 10px !important;
+          text-align: center;
+        }
+        .current-chat-area {
+          padding-top: 10px;
+          overflow: auto;
+          height: 80vh;
+        }
+      }
+      #rooms {
+        height: auto;
+        overflow-x: hidden;
+        max-height: 100vh;
+      }
+    </style>
 
-		}
-		.current-chat-area {
-			padding-top: 10px;
-			overflow: auto;
-			height: 85vh;
-		}
-		.current-chat-footer {
-				position: absolute; 
-				bottom: 0;
-				width: 100%;
-			}
-		@media screen and (max-width: 991px){
-			.current-chat-footer {
-				position: relative; 
-				bottom: 0;
-				width: 100vw;
-			}
-			.btn-change-room {
-		    width: 110px;
-		    display: inline-block !important;
-		    margin-right: auto;
-		    text-align: center;
-		    float: none !important;
-			}
-			.chat-toolbar {
-				padding-top: 10px !important;
-				text-align: center;
-			}
-			.current-chat-area {
-				padding-top: 10px;
-				overflow: auto;
-				height: 80vh;
-			}
-		}
-		#rooms {
-			height: auto;
-			overflow-x: hidden;
-			max-height: 100vh;
-		}
-	</style>
+    <title>Welcome to Goddit | reddit chat</title>
+  </head>
 
-	<title>Welcome to Goddit | reddit chat</title>
-	
-</head>
+  <body>
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-lg-2 col-md-2 hidden-xs">
+          <div class="row chats-row">
+            <!-- SUBREDDITS -->
+            <div class="media-list" id="rooms">
+              {{range .Chatrooms}}
+              <a href="#" class="list-group-item">/r/{{ .Name }}</a>
+              {{end}}
+            </div>
+            <!-- END SUBREDDITS -->
+          </div>
+        </div>
+        <div class="col-lg-10 col-md-10 col-xs-12 current-chat">
+          <div class="row chat-toolbar-row">
+            <div class="col-sm-12 col-xs-12 ">
+              <div class="btn-group chat-toolbar" role="group">
+                <a
+                  href="#"
+                  id="chat-leave"
+                  class="btn btn-default ticket-option"
+                  type="button"
+                >
+                  <i class="glyphicon glyphicon-remove-sign"></i> Leave Chat
+                </a>
+                <button
+                  type="button"
+                  class="btn btn-primary visible-xs btn-change-room"
+                  data-toggle="modal"
+                  data-target="#subreddits-modal"
+                >
+                  Change Room
+                </button>
+                <a
+                  class="twitter-share-button"
+                  href="https://twitter.com/intent/tweet?text=Check out this reddit chat&url={{ .ServerAddr }}"
+                  data-size="large"
+                >
+                  Tweet
+                </a>
+              </div>
+            </div>
+          </div>
+          <div class="row current-chat-area">
+            <div class="col-md-12">
+              <ul class="media-list" id="log">
+                <!-- CHAT MESSAGES -->
+              </ul>
+            </div>
+          </div>
+          <div class="row current-chat-footer">
+            <div class="panel-footer">
+              <div class="input-group">
+                <input
+                  type="text"
+                  class="form-control"
+                  id="msg"
+                  autocomplete="off"
+                />
+                <span class="input-group-btn">
+                  <button class="btn btn-default" type="button" id="submit">
+                    Send
+                  </button>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-<body>
-	<div class="container-fluid">
-		<div class="row">
-			<div class="col-lg-2 col-md-2 hidden-xs">
-				<div class="row chats-row">
-					<!-- SUBREDDITS -->
-					<div class="media-list" id="rooms">
-						{{range $i, $a := .Chatrooms}}
-							<a href="#" class="list-group-item">{{ . }}</a> 
-						{{end}}
-					</div>
-					<!-- END SUBREDDITS -->
-				</div>
-			</div>
-			<div class="col-lg-10 col-md-10 col-xs-12 current-chat">
-				<div class="row chat-toolbar-row">
-					<div class="col-sm-12 col-xs-12 ">
-						<div class="btn-group chat-toolbar" role="group">
-							<a href="#" id="chat-leave" class="btn btn-default ticket-option" 
-								type="button">
-								<i class="glyphicon glyphicon-remove-sign"></i> Leave Chat </a>
-								<button type="button" class="btn btn-primary visible-xs btn-change-room" data-toggle="modal" data-target="#subreddits-modal">Change Room</button>
-							<a class="twitter-share-button" 
-								href="https://twitter.com/intent/tweet?text=Check out this reddit chat&url={{ .ServerAddr }}"
-							  data-size="large"> Tweet
-							</a>
-						</div>
-					</div>
-				</div>
-				<div class="row current-chat-area">
-					<div class="col-md-12">
-						<ul class="media-list" id="log">
-							<!-- CHAT MESSAGES -->
-						</ul>
-					</div>
-				</div>
-				<div class="row current-chat-footer">
-					<div class="panel-footer">
-						<div class="input-group">
-							<input type="text" class="form-control" id="msg" autocomplete="off">
-							<span class="input-group-btn">
-					<button class="btn btn-default" type="button" id="submit">Send</button>
-				  </span>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
+    <div class="modal fade" tabindex="-1" role="dialog" id="subreddits-modal">
+      <div class="modal-dialog modal-sm" role="document">
+        <div class="modal-content">
+          <div class="media-list" id="rooms-mobile">
+            {{range .Chatrooms}}
+            <a href="#" class="list-group-item">/r/{{ .Name }}</a>
+            {{end}}
+          </div>
+        </div>
+      </div>
+    </div>
 
-	<div class="modal fade" tabindex="-1" role="dialog" id="subreddits-modal">
-	  <div class="modal-dialog modal-sm" role="document">
-	    <div class="modal-content">
-	      <div class="media-list" id="rooms-mobile">
-						{{range $i, $a := .Chatrooms}}
-							<a href="#" class="list-group-item">{{ . }}</a> 
-						{{end}}
-					</div>
-	    </div>
-	  </div>
-	</div>
+    <script>
+      window.twttr = (function(d, s, id) {
+        var js,
+          fjs = d.getElementsByTagName(s)[0],
+          t = window.twttr || {};
+        if (d.getElementById(id)) return t;
+        js = d.createElement(s);
+        js.id = id;
+        js.src = "https://platform.twitter.com/widgets.js";
+        fjs.parentNode.insertBefore(js, fjs);
 
-	<script>window.twttr = (function(d, s, id) {
-  var js, fjs = d.getElementsByTagName(s)[0],
-    t = window.twttr || {};
-  if (d.getElementById(id)) return t;
-  js = d.createElement(s);
-  js.id = id;
-  js.src = "https://platform.twitter.com/widgets.js";
-  fjs.parentNode.insertBefore(js, fjs);
+        t._e = [];
+        t.ready = function(f) {
+          t._e.push(f);
+        };
 
-  t._e = [];
-  t.ready = function(f) {
-    t._e.push(f);
-  };
-
-  return t;
-}(document, "script", "twitter-wjs"));</script>
-</body>
-
+        return t;
+      })(document, "script", "twitter-wjs");
+    </script>
+  </body>
 </html>
