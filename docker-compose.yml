@@ -1,0 +1,21 @@
+version: "3.7"
+
+services:
+  mongo:
+    image: mongo:latest
+    container_name: "mongo"
+    ports:
+      - "27017-27019:27017-27019"
+    volumes:
+      - /var/lib/mongo:/var/lib/mongodb
+    networks:
+      - net
+
+  goddit:
+    build:
+      context: .
+    networks:
+      - net
+
+networks:
+  net:

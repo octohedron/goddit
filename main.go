@@ -99,16 +99,22 @@ var Mongo *MongoDBConnections
 var MessageChannel chan []byte
 
 func newMongoDBConnections() *MongoDBConnections {
-	// connect to the database
-	session, err := mgo.Dial(MONGO_ADDR)
-	if err != nil {
-		panic(err)
-	}
-	session.SetMode(mgo.Monotonic, true)
-	return &MongoDBConnections{
-		Session:   session,
-		Messages:  session.DB("views").C("messages"),
-		Chatrooms: session.DB("views").C("chatrooms"),
+	for {
+		log.Println(MONGO_ADDR)
+		// connect to the database
+		session, err := mgo.Dial(MONGO_ADDR)
+		if err == nil {
+			log.Println("CONNECTED TO MOngoDB")
+			session.SetMode(mgo.Monotonic, true)
+			return &MongoDBConnections{
+				Session:   session,
+				Messages:  session.DB("views").C("messages"),
+				Chatrooms: session.DB("views").C("chatrooms"),
+			}
+		} else {
+			log.Println("Attempting MongoDB connection", err)
+			time.Sleep(1 * time.Second)
+		}
 	}
 }
 
