@@ -10,4 +10,4 @@ WORKDIR /root/
 COPY --from=0 /go/src/github.com/octohedron/goddit .
 
 
-CMD ["./goddit"]  
+CMD ["./goddit"]
